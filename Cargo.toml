@@ -1,0 +1,10 @@
+[package]
+name = "music-player"
+version = "0.1.0"
+authors = ["Ryan Blecher <notryanb@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+crossterm = "0.9"
+lazy_static = "1.3"
+rodio = "0.9"
