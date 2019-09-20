@@ -1,0 +1,9 @@
+ls
+ls | where type = File
+ls | where type == File
+exa
+ls
+cd Rust\music-player\
+ls
+git status
+cargo run
