@@ -1,12 +1,167 @@
-extern crate crossterm;
-extern crate rodio;
-
-use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
 
-use crossterm::{AsyncReader, ClearType, Color, Colorize, Crossterm, InputEvent, KeyEvent, RawScreen};
-use rodio::{Device, Sink};
+use eframe::{egui, epi};
+use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
+
+mod playlist;
+use playlist::{Playlist, Track};
+
+struct AppState {
+    pub track_state: TrackState,
+    pub selected_file: Option<String>,
+    pub playlists: Vec<Playlist>,
+    pub current_playlist: Option<Playlist>,
+    pub sink: Sink,
+    pub stream_handle: OutputStreamHandle,
+}
+
+impl epi::App for AppState {
+    fn update(&mut self, ctx: &egui::CtxRef, _frame: &mut epi::Frame<'_>) {
+        egui::TopBottomPanel::top("MusicPlayer").show(ctx, |ui| {
+            ui.label("Welcome to MusicPlayer!");
+        });
+
+        egui::TopBottomPanel::top("Player stuff").show(ctx, |ui| {
+            self.player_ui(ui);
+        });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            egui::SidePanel::left("Library Window")
+                .min_width(200.)
+                .show(ctx, |ui| {
+                    ui.label("music library");
+                })
+        });
+
+        self.main_window(ctx);
+    }
+
+    fn name(&self) -> &str {
+        "Music Player"
+    }
+}
+
+impl AppState {
+    fn main_window(&mut self, ctx: &egui::CtxRef) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            egui::TopBottomPanel::top("Playlist Tabs").show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    for playlist in &self.playlists {
+                        let playlist_tab = ui.button(playlist.get_name().unwrap());
+
+                        if playlist_tab.clicked() {
+                            self.current_playlist = Some((*playlist).clone());
+                        }
+                    }
+                });
+            });
+
+            // Playlist contents
+            egui::CentralPanel::default().show(ctx, |ui| {
+                if let Some(current_playlist) = &mut self.current_playlist {
+                    if ui.button("Add file to playlist").clicked() {
+                        if let Some(path) = rfd::FileDialog::new().pick_file() {
+                            tracing::info!("Adding file to playlist");
+                            current_playlist.add(Track { path });
+                        }
+                    }
+
+                    for track in current_playlist.tracks.iter() {
+                        let track_item = ui.add(
+                            egui::Label::new(track.path.as_path().display())
+                                .sense(egui::Sense::click()),
+                        );
+
+                        if track_item.clicked() {
+                            tracing::info!("Clicked {:?}", &track.path);
+                            let path_string =
+                                track.path.clone().into_os_string().into_string().unwrap();
+                            self.selected_file = Some(path_string.clone());
+                        }
+                    }
+                }
+            });
+        });
+    }
+
+    fn player_ui(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            let stop_btn = ui.button("■");
+            let play_btn = ui.button("▶");
+            let pause_btn = ui.button("⏸");
+
+            if ui.button("Create Playlist +").clicked() {
+                let mut new_playlist = Playlist::new();
+                new_playlist.set_name("New Playlist".to_string());
+                
+                self.playlists.push(new_playlist.clone());
+                self.current_playlist = Some(new_playlist.clone());
+            }
+            
+            if let Some(selected_file) = &self.selected_file {
+                ui.label("Track State: ");
+                ui.monospace(&self.track_state);
+                
+                ui.label(selected_file);
+
+                let file = BufReader::new(std::fs::File::open(&selected_file).expect("Failed to open file"));
+                let source = Decoder::new(file).expect("Failed to decode audio file");   
+
+                if stop_btn.clicked() {
+                    match &self.track_state {
+                        TrackState::Playing | TrackState::Paused => {
+                            self.track_state = TrackState::Stopped;
+                            tracing::info!("Stopping the source that is in the sink's queue");
+                            self.sink.stop();
+        
+                            if self.sink.empty() {
+                                tracing::info!("STOPPED: The sink has no more sounds to play");
+                            }
+                        },
+                        _ => ()
+                    }
+                }
+    
+                if play_btn.clicked() {
+                    match self.track_state {
+                        TrackState::Unstarted | TrackState::Stopped => {
+                            self.track_state = TrackState::Playing;
+                            tracing::info!("Appending audio source to sink queue");
+    
+                            if self.sink.empty() {
+                                tracing::info!("Playing: The sink has no more sounds to play");
+                            }
+                            self.sink = Sink::try_new(&self.stream_handle).unwrap();
+                            
+                            self.sink.append(source);
+    
+                            if self.sink.empty() {
+                                tracing::warn!("Playing: uh, we just appended a source. This should NOT be hit");
+                            }
+                        },
+                        TrackState::Paused => {
+                            // TODO! - Add check if the sink has a source in it's queue.
+                            tracing::info!("Should already have source in the sink queue, going to play");
+                            self.sink.play();
+                            self.track_state = TrackState::Playing;
+                        },
+                        _ => ()
+                    }
+                }
+    
+                if pause_btn.clicked() {
+                    match self.track_state {
+                        TrackState::Playing => {
+                            self.track_state = TrackState::Paused;
+                            self.sink.pause();
+                        },
+                        _ => ()
+                    }
+                }
+            }
+        });
+    }
+}
 
 pub enum TrackState {
     Unstarted,
@@ -15,134 +170,34 @@ pub enum TrackState {
     Paused,
 }
 
-pub struct Player<'a> {
-    pub track_state: TrackState,
-    pub track_path: &'a Path,
-    pub sink: Sink,
-    pub device: Device,
-}
-
-impl Player<'_> {
-    pub fn new<'a>(track_path: &'a str) -> Player {
-        let device = rodio::default_output_device().unwrap();
-
-        Player {
-            track_path: Path::new(track_path),
-            track_state: TrackState::Unstarted,
-            sink: Sink::new(&device),
-            device: rodio::default_output_device().unwrap(),
+impl std::fmt::Display for TrackState {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TrackState::Unstarted => write!(f, "Unstarted"),
+            TrackState::Stopped => write!(f, "Stopped"),
+            TrackState::Playing => write!(f, "Playing"),
+            TrackState::Paused => write!(f, "Paused"),
         }
     }
-
-    pub fn start(&mut self) {
-        let file = File::open(self.track_path).unwrap();
-        let source = rodio::Decoder::new(BufReader::new(file)).expect("Could not create decoder from file");
-
-        self.sink = Sink::new(&self.device);
-
-        self.sink.append(source);
-        self.track_state = TrackState::Playing;
-    }
-
-    pub fn stop(&mut self) {
-        self.sink.stop();
-        self.track_state = TrackState::Stopped
-    }
-
-    pub fn play(&mut self) {
-        self.sink.play();
-        self.track_state = TrackState::Playing
-    }
-
-    pub fn pause(&mut self) {
-        self.sink.pause();
-        self.track_state = TrackState::Paused
-    }
 }
-
-
 
 fn main() {
-    let raw_mode = RawScreen::into_raw_mode();
-    let crossterm = Crossterm::new();
+    tracing_subscriber::fmt::init();
+    tracing::info!("App booting...");
 
-    crossterm.cursor().hide();
-    let mut stdin = crossterm.input().read_async();
-    let mut player = Player::new("E:\\Mp3s\\Fuel\\Fuel - Monuments to Excess\\fuel-03-some gods.mp3");
+    let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+    let sink = Sink::try_new(&stream_handle).unwrap();
 
-    loop {
-        let pressed_key = stdin.next();
+    let app_state = AppState {
+        track_state: TrackState::Unstarted,
+        selected_file: None,
+        sink,
+        stream_handle,
+        playlists: Vec::new(),
+        current_playlist: None,
+    };
 
-
-        if let Some(InputEvent::Keyboard(KeyEvent::Char(character))) = pressed_key {
-            match character {
-                'e' =>  { 
-                    println!("Pressed e(xit) ... quitting");
-                },
-                's' => {
-                    println!("Pressed s"); // stop
-                    match &player.track_state {
-                        TrackState::Unstarted | TrackState::Stopped => player.start(),
-                        TrackState::Playing | TrackState::Paused => player.stop(),
-                    }
-                },
-                'p' =>{
-                    println!("Pressed p"); // play
-                    match &player.track_state {
-                        TrackState::Paused => player.play(),
-                        TrackState::Playing => player.pause(),
-                        TrackState::Stopped | TrackState::Unstarted => println!("can't pause or play a track that is stopped or not started"),
-                    }
-                }, // play
-                _ => ()
-            }
-        }
-    }
+    let mut window_options = eframe::NativeOptions::default();
+    window_options.initial_window_size = Some(egui::Vec2::new(1024., 768.));
+    eframe::run_native(Box::new(app_state), window_options);
 }
-
-
-// fn main() {
-//     use std::{thread, time};
-
-
-//     let track_path = "E:\\Mp3s\\45 grave\\45 grave - concerned citizen.mp3";
-//     let file = File::open(track_path).unwrap();
-//     let source = rodio::Decoder::new(BufReader::new(file)).expect("Could not create decoder from file");
-//     let device = rodio::default_output_device().unwrap();
-//     let sink = Sink::new(&device);
-
-//     println!("Sink Len [before starting first track]: {:?}", sink.len());
-//     println!("Sink Empty [before starting first track]: {:?}", sink.empty());
-
-//     sink.append(source);
-
-//     println!("Sink Len [after starting first track]: {:?}", sink.len());
-//     println!("Sink Empty [after starting first track]: {:?}", sink.empty());
-//     println!("Sleeping 10 seconds...");
-
-//     let five_seconds = time::Duration::from_millis(5_000);
-//     thread::sleep(five_seconds);
-
-//     println!("stopping sink");
-//     sink.stop();
-
-//     let five_seconds = time::Duration::from_millis(5_000);
-//     thread::sleep(five_seconds);
-
-//     println!("Sink Len [after stopping first track]: {:?}", sink.len());
-//     println!("Sink Empty [after stopping first track]: {:?}", sink.empty());
-//     println!("appending same newly opened file and decoder");
-
-//     let track_path2 = "E:\\Mp3s\\45 grave\\45 grave - concerned citizen.mp3";
-//     let file2 = File::open(track_path2).unwrap();
-//     let source2 = rodio::Decoder::new(BufReader::new(file2)).expect("Could not create decoder from file");
-//     let sink2 = Sink::new(&device);
-//     sink2.append(source2);
-//     // sink.play();
-
-//     println!("Sink Len [after starting second track]: {:?}", sink2.len());
-//     println!("Sink Empty [after second track]: {:?}", sink2.empty());
-
-//     let five_seconds = time::Duration::from_millis(5_000);
-//     thread::sleep(five_seconds);
-// }
