@@ -10,7 +10,7 @@ struct AppState {
     pub track_state: TrackState,
     pub selected_file: Option<String>,
     pub playlists: Vec<Playlist>,
-    pub current_playlist: Option<Playlist>,
+    pub current_playlist_idx: Option<usize>,
     pub sink: Sink,
     pub stream_handle: OutputStreamHandle,
 }
@@ -46,11 +46,11 @@ impl AppState {
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::TopBottomPanel::top("Playlist Tabs").show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    for playlist in &self.playlists {
+                    for (idx, playlist) in self.playlists.iter().enumerate() {
                         let playlist_tab = ui.button(playlist.get_name().unwrap());
 
                         if playlist_tab.clicked() {
-                            self.current_playlist = Some((*playlist).clone());
+                            self.current_playlist_idx = Some(idx);
                         }
                     }
                 });
@@ -58,15 +58,15 @@ impl AppState {
 
             // Playlist contents
             egui::CentralPanel::default().show(ctx, |ui| {
-                if let Some(current_playlist) = &mut self.current_playlist {
+                if let Some(current_playlist_idx) = &mut self.current_playlist_idx {
                     if ui.button("Add file to playlist").clicked() {
                         if let Some(path) = rfd::FileDialog::new().pick_file() {
                             tracing::info!("Adding file to playlist");
-                            current_playlist.add(Track { path });
+                            self.playlists[*current_playlist_idx].add(Track { path });
                         }
                     }
 
-                    for track in current_playlist.tracks.iter() {
+                    for track in self.playlists[*current_playlist_idx].tracks.iter() {
                         let track_item = ui.add(
                             egui::Label::new(track.path.as_path().display())
                                 .sense(egui::Sense::click()),
@@ -95,7 +95,7 @@ impl AppState {
                 new_playlist.set_name("New Playlist".to_string());
                 
                 self.playlists.push(new_playlist.clone());
-                self.current_playlist = Some(new_playlist.clone());
+                self.current_playlist_idx = Some(self.playlists.len() - 1);
             }
             
             if let Some(selected_file) = &self.selected_file {
@@ -194,7 +194,7 @@ fn main() {
         sink,
         stream_handle,
         playlists: Vec::new(),
-        current_playlist: None,
+        current_playlist_idx: None,
     };
 
     let mut window_options = eframe::NativeOptions::default();

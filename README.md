@@ -22,13 +22,21 @@ It is not meant to be used as a serious audio player.
 
 ## Stuff to fix or implement
 
-- [ ] Reference playlists by index or actual reference (not a clone...), so info is not lost when changing playlist context
-- [ ] Stop with all the cloning... seriously. Everything is cloned.
-- [ ] Implement library and text search.
-- [ ] Save playlists.
-- [ ] Save app state on close.
+- [x] Reference playlists by index or actual reference (not a clone...), so info is not lost when changing playlist context
+- [ ] Double clicking track automatically starts to play it.
 - [ ] Remove tracks from playlist.
 - [ ] Reorder items in playlist.
-- [ ] Double clicking track automatically starts to play it.
+- [ ] Save playlists.
+- [ ] Add Next and Previous controls
+- [ ] Pause is a toggle
+- [ ] Play restarts the track
+- [ ] Add player indicators next to the track
+- [ ] Add volume control slider
+- [ ] Save app state on close.
+- [ ] Set currently playing track as app Title
+- [ ] Stop with all the cloning... seriously. Everything is cloned.
+- [ ] Handle files which can't be decoded correctly into audio. 
+- [ ] Implement library and text search.
 - [ ] Playlist plays to end after track is selected.
-- [ ] Scrollable playlist tab section in case too many playlists are created.
+- [ ] Un-named playlists get `(idx)` appended 
+- [ ] Playlist tab section stacks playlist tabs when they don't fit.
