@@ -19,6 +19,7 @@ It is not meant to be used as a serious audio player.
 - Visualizations
 - Stream audio
 - Swappable frontend so I can try other Rust cross platform gui libaries.
+- Scrubbable audio. ie. Keep position in audio and arbitrarily move to any position
 
 ## Stuff to fix or implement
 
@@ -38,6 +39,6 @@ It is not meant to be used as a serious audio player.
 - [ ] Handle files which can't be decoded correctly into audio. 
 - [ ] Implement library and text search.
 - [ ] Playlist plays to end after track is selected.
-- [ ] Un-named playlists get `(idx)` appended 
-- [ ] Playlist tab section stacks playlist tabs when they don't fit.
+- [x] Un-named playlists get `(idx)` appended 
+- [x] Playlist tab section stacks playlist tabs when they don't fit.
 - [ ] Differentiate between a selected track and the currently playing one.
