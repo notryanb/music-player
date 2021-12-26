@@ -40,7 +40,7 @@ impl AppState {
     fn main_window(&mut self, ctx: &egui::CtxRef) {
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::TopBottomPanel::top("Playlist Tabs").show(ctx, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     for (idx, playlist) in self.playlists.iter().enumerate() {
                         let playlist_tab = ui.button(playlist.get_name().unwrap());
 
@@ -90,8 +90,14 @@ impl AppState {
             let pause_btn = ui.button("⏸");
 
             if ui.button("Create Playlist +").clicked() {
+                let default_name_count = self.playlists.iter().filter(|pl| pl.get_name().unwrap().starts_with("New Playlist")).count();
+                let playlist_name = match default_name_count {
+                    0 => "New Playlist".to_string(),
+                    _ => format!("New Playlist ({})", default_name_count - 1),
+                };
+
                 let mut new_playlist = Playlist::new();
-                new_playlist.set_name("New Playlist".to_string());
+                new_playlist.set_name(playlist_name);
 
                 self.playlists.push(new_playlist.clone());
                 self.current_playlist_idx = Some(self.playlists.len() - 1);
