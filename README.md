@@ -23,13 +23,13 @@ It is not meant to be used as a serious audio player.
 ## Stuff to fix or implement
 
 - [x] Reference playlists by index or actual reference (not a clone...), so info is not lost when changing playlist context
-- [ ] Double clicking track automatically starts to play it.
+- [x] Double clicking track automatically starts to play it.
 - [ ] Remove tracks from playlist.
 - [ ] Reorder items in playlist.
 - [ ] Save playlists.
 - [ ] Add Next and Previous controls
-- [ ] Pause is a toggle
-- [ ] Play restarts the track
+- [x] Pause is a toggle
+- [x] Play restarts the track
 - [ ] Add player indicators next to the track
 - [ ] Add volume control slider
 - [ ] Save app state on close.
@@ -40,3 +40,4 @@ It is not meant to be used as a serious audio player.
 - [ ] Playlist plays to end after track is selected.
 - [ ] Un-named playlists get `(idx)` appended 
 - [ ] Playlist tab section stacks playlist tabs when they don't fit.
+- [ ] Differentiate between a selected track and the currently playing one.
