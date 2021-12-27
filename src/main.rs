@@ -8,6 +8,7 @@ struct AppState {
     pub player: Player,
     pub playlists: Vec<Playlist>,
     pub current_playlist_idx: Option<usize>,
+    pub playlist_idx_to_remove: Option<usize>,
 }
 
 impl epi::App for AppState {
@@ -42,11 +43,43 @@ impl AppState {
             egui::TopBottomPanel::top("Playlist Tabs").show(ctx, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     for (idx, playlist) in self.playlists.iter().enumerate() {
-                        let playlist_tab = ui.button(playlist.get_name().unwrap());
+                        let playlist_tab = ui.add(
+                            egui::Label::new(playlist.get_name().unwrap())
+                                .sense(egui::Sense::click()),
+                        );
 
                         if playlist_tab.clicked() {
+                            tracing::info!("playlist tab was clicked");
                             self.current_playlist_idx = Some(idx);
                         }
+
+                        if playlist_tab.clicked_by(egui::PointerButton::Secondary) {
+                            tracing::info!("Right clicked the playlist tab idx {}", idx);
+
+                            // TODO - make this bring up a context menu, however just delete for
+                            // now.
+
+                            self.playlist_idx_to_remove = Some(idx);
+                        }
+                    }
+
+                    if let Some(idx) = self.playlist_idx_to_remove {
+                        self.playlist_idx_to_remove = None;
+
+                        // Because the current playlist is referenced via index, we need to take
+                        // into account that the index may be out of bounds when removing a
+                        // playlist. This should be resolved when I figure out how to reference the
+                        // actual selected playlist.
+                        if let Some(mut current_playlist_idx) = self.current_playlist_idx {
+                            if current_playlist_idx == 0 && idx == 0 {
+                                self.current_playlist_idx = None;
+                            } else if current_playlist_idx >= idx {
+                                current_playlist_idx -= 1;
+                                self.current_playlist_idx = Some(current_playlist_idx);
+                            }
+                        }
+
+                        self.playlists.remove(idx);
                     }
                 });
             });
@@ -68,13 +101,13 @@ impl AppState {
                         );
 
                         if track_item.double_clicked() {
-                            tracing::info!("Double clicked {:?}", &track.path);
+                            tracing::debug!("Double clicked {:?}", &track.path);
                             self.player.selected_track = Some(track.clone());
                             self.player.play();
                         }
 
                         if track_item.clicked() {
-                            tracing::info!("Clicked {:?}", &track.path);
+                            tracing::debug!("Clicked {:?}", &track.path);
                             self.player.selected_track = Some(track.clone());
                         }
                     }
@@ -90,7 +123,11 @@ impl AppState {
             let pause_btn = ui.button("⏸");
 
             if ui.button("Create Playlist +").clicked() {
-                let default_name_count = self.playlists.iter().filter(|pl| pl.get_name().unwrap().starts_with("New Playlist")).count();
+                let default_name_count = self
+                    .playlists
+                    .iter()
+                    .filter(|pl| pl.get_name().unwrap().starts_with("New Playlist"))
+                    .count();
                 let playlist_name = match default_name_count {
                     0 => "New Playlist".to_string(),
                     _ => format!("New Playlist ({})", default_name_count - 1),
@@ -136,6 +173,7 @@ fn main() {
         player: Player::new(sink, stream_handle),
         playlists: Vec::new(),
         current_playlist_idx: None,
+        playlist_idx_to_remove: None,
     };
 
     let mut window_options = eframe::NativeOptions::default();
