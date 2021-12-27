@@ -25,6 +25,7 @@ It is not meant to be used as a serious audio player.
 
 - [x] Reference playlists by index or actual reference (not a clone...), so info is not lost when changing playlist context
 - [x] Double clicking track automatically starts to play it.
+- [x] Remove playlists.
 - [ ] Remove tracks from playlist.
 - [ ] Reorder items in playlist.
 - [ ] Save playlists.
