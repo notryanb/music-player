@@ -142,6 +142,15 @@ impl AppState {
                 self.current_playlist_idx = Some(self.playlists.len() - 1);
             }
 
+            let mut volume = self.player.volume;
+            ui.add(
+                egui::Slider::new(&mut volume, (0.0 as f32)..=(10.0 as f32))
+                    .logarithmic(false)
+                    .show_value(false)
+                    .clamp_to_range(true)
+            );
+           self.player.set_volume(volume);
+
             if let Some(selected_track) = &self.player.selected_track {
                 ui.label("Track State: ");
                 ui.monospace(&self.player.track_state);
