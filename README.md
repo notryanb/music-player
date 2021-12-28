@@ -34,7 +34,7 @@ It is not meant to be used as a serious audio player.
 - [x] Pause is a toggle
 - [x] Play restarts the track
 - [ ] Add player indicators next to the track
-- [ ] Add volume control slider
+- [x] Add volume control slider
 - [ ] Save app state on close.
 - [ ] Set currently playing track as app Title
 - [ ] Stop with all the cloning... seriously. Everything is cloned.

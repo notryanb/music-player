@@ -5,6 +5,7 @@ pub struct Player {
     pub selected_track: Option<Track>,
     pub sink: rodio::Sink,
     pub stream_handle: rodio::OutputStreamHandle,
+    pub volume: f32,
 }
 
 impl Player {
@@ -14,6 +15,7 @@ impl Player {
             selected_track: None,
             sink: sink,
             stream_handle: stream_handle,
+            volume: 1.0,
         }
     }
 
@@ -95,6 +97,11 @@ impl Player {
                 }
             }
         }
+    }
+
+    pub fn set_volume(&mut self, volume: f32) {
+        self.volume = volume;
+        self.sink.set_volume(volume);
     }
 }
 
