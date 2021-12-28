@@ -29,7 +29,8 @@ It is not meant to be used as a serious audio player.
 - [ ] Remove tracks from playlist.
 - [ ] Reorder items in playlist.
 - [ ] Save playlists.
-- [ ] Add Next and Previous controls
+- [ ] Selected track is highlighted.
+- [x] Add Next and Previous controls
 - [x] Pause is a toggle
 - [x] Play restarts the track
 - [ ] Add player indicators next to the track

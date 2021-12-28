@@ -1,4 +1,4 @@
-use crate::stuff::playlist::Track;
+use crate::stuff::playlist::{Playlist, Track};
 
 pub struct Player {
     pub track_state: TrackState,
@@ -69,6 +69,31 @@ impl Player {
                 self.sink.play();
             }
             _ => (),
+        }
+    }
+    
+    pub fn previous(&mut self, playlist: &Playlist) {
+        if let Some(selected_track) = &self.selected_track {
+            if let Some(current_track_position) = playlist.get_pos(&selected_track) {
+                if current_track_position > 0 {
+                    let previous_track = &playlist.tracks[current_track_position - 1];
+                    self.selected_track = Some(previous_track.clone());
+                    self.play();
+                }
+            }
+
+        }
+    }
+
+    pub fn next(&mut self, playlist: &Playlist) {
+        if let Some(selected_track) = &self.selected_track {
+            if let Some(current_track_position) = playlist.get_pos(&selected_track) {
+                if current_track_position < playlist.tracks.len() - 1 {
+                    let next_track = &playlist.tracks[current_track_position + 1];
+                    self.selected_track = Some(next_track.clone());
+                    self.play();
+                }
+            }
         }
     }
 }

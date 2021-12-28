@@ -121,6 +121,8 @@ impl AppState {
             let stop_btn = ui.button("■");
             let play_btn = ui.button("▶");
             let pause_btn = ui.button("⏸");
+            let prev_btn = ui.button("|◀");
+            let next_btn = ui.button("▶|");
 
             if ui.button("Create Playlist +").clicked() {
                 let default_name_count = self
@@ -156,6 +158,14 @@ impl AppState {
 
                 if pause_btn.clicked() {
                     self.player.pause();
+                }
+
+                if prev_btn.clicked() {
+                    self.player.previous(&self.playlists[(self.current_playlist_idx).unwrap()])
+                }
+                
+                if next_btn.clicked() {
+                    self.player.next(&self.playlists[(self.current_playlist_idx).unwrap()])
                 }
             }
         });
