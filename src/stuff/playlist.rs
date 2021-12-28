@@ -45,6 +45,10 @@ impl Playlist {
     pub fn select(&mut self, idx: usize) {
         self.selected = Some(self.tracks[idx].clone());
     }
+
+    pub fn get_pos(&self, track: &Track) -> Option<usize> {
+        self.tracks.iter().position(|t| t == track)
+    }
 }
 
 // TODO - Probably shouldn't hold the actual bytes, but borrowed tag information after the file is opened.
