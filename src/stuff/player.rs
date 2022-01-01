@@ -54,7 +54,6 @@ impl Player {
                     self.track_state = TrackState::Playing;
                     self.sink.play();
                 }
-                _ => (),
             }
         }
     }
@@ -73,7 +72,7 @@ impl Player {
             _ => (),
         }
     }
-    
+
     pub fn previous(&mut self, playlist: &Playlist) {
         if let Some(selected_track) = &self.selected_track {
             if let Some(current_track_position) = playlist.get_pos(&selected_track) {
@@ -83,7 +82,6 @@ impl Player {
                     self.play();
                 }
             }
-
         }
     }
 

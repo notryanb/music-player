@@ -39,8 +39,13 @@ It is not meant to be used as a serious audio player.
 - [ ] Set currently playing track as app Title
 - [ ] Stop with all the cloning... seriously. Everything is cloned.
 - [ ] Handle files which can't be decoded correctly into audio. 
-- [ ] Implement library and text search.
+- [x] Implement library
+- [ ] Implement library search.
 - [ ] Playlist plays to end after track is selected.
 - [x] Un-named playlists get `(idx)` appended 
 - [x] Playlist tab section stacks playlist tabs when they don't fit.
 - [ ] Differentiate between a selected track and the currently playing one.
+- [ ] Refactor so the items parsed in the library are the primary data type passed around instead of separate library items and tracks.
+- [ ] Library display options [ album, artist, year, genre, folder structure, etc...]
+- [ ] Improve library build performance
+- [ ] Library Item hashable?
