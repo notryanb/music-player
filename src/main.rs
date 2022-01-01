@@ -15,7 +15,7 @@ struct AppState {
 }
 
 impl epi::App for AppState {
-    fn update(&mut self, ctx: &egui::CtxRef, _frame: &mut epi::Frame<'_>) {
+    fn update(&mut self, ctx: &egui::CtxRef, _frame: &epi::Frame) {
         egui::TopBottomPanel::top("MusicPlayer").show(ctx, |ui| {
             ui.label("Welcome to MusicPlayer!");
         });
@@ -34,6 +34,7 @@ impl epi::App for AppState {
 
                         if ui.button("Add Library path").clicked() {
                             if let Some(lib_path) = rfd::FileDialog::new().pick_folder() {
+                                tracing::info!("adding library path...");
                                 let mut library = Library::new(lib_path);
                                 library.build();
                                 self.library = Some(library);
@@ -49,7 +50,7 @@ impl epi::App for AppState {
                                     .into_string()
                                     .unwrap();
 
-                                egui::CollapsingHeader::new(&path_string)
+                                egui::CollapsingHeader::new(egui::RichText::new(path_string))
                                     .default_open(true)
                                     .show(ui, |ui| {
                                         for (key, group) in &library_items
@@ -69,7 +70,7 @@ impl epi::App for AppState {
                                             .show(ui, |ui| {
                                                 for item in &items {
                                                     let item_label = ui.add(
-                                                        egui::Label::new(item.title().unwrap())
+                                                        egui::Label::new(egui::RichText::new(item.title().unwrap()))
                                                             .sense(egui::Sense::click()),
                                                     );
 
@@ -178,7 +179,7 @@ impl AppState {
 
                     for track in self.playlists[*current_playlist_idx].tracks.iter() {
                         let track_item = ui.add(
-                            egui::Label::new(track.path.as_path().display())
+                            egui::Label::new(egui::RichText::new(track.path.clone().into_os_string().into_string().unwrap()))
                                 .sense(egui::Sense::click()),
                         );
 
@@ -234,10 +235,10 @@ impl AppState {
             self.player.set_volume(volume);
 
             if let Some(selected_track) = &self.player.selected_track {
-                ui.label("Track State: ");
-                ui.monospace(&self.player.track_state);
+                ui.label(egui::RichText::new("Track State: "));
+                ui.monospace(egui::RichText::new(self.player.track_state.to_string()));
 
-                ui.label(selected_track.path.display());
+                ui.label(egui::RichText::new(&selected_track.path.clone().into_os_string().into_string().unwrap()));
 
                 if stop_btn.clicked() {
                     self.player.stop();
