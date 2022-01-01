@@ -1,6 +1,8 @@
 use eframe::{egui, epi};
+use itertools::Itertools;
 
 mod stuff;
+use crate::stuff::library::{Library, LibraryItem};
 use crate::stuff::player::Player;
 use crate::stuff::playlist::{Playlist, Track};
 
@@ -9,6 +11,7 @@ struct AppState {
     pub playlists: Vec<Playlist>,
     pub current_playlist_idx: Option<usize>,
     pub playlist_idx_to_remove: Option<usize>,
+    pub library: Option<Library>,
 }
 
 impl epi::App for AppState {
@@ -21,12 +24,91 @@ impl epi::App for AppState {
             self.player_ui(ui);
         });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ctx, |_ui| {
             egui::SidePanel::left("Library Window")
                 .min_width(200.)
+                .default_width(250.0)
                 .show(ctx, |ui| {
-                    ui.label("music library");
-                })
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        ui.label("music library");
+
+                        if ui.button("Add Library path").clicked() {
+                            if let Some(lib_path) = rfd::FileDialog::new().pick_folder() {
+                                let mut library = Library::new(lib_path);
+                                library.build();
+                                self.library = Some(library);
+                            }
+                        }
+
+                        if let Some(library) = &self.library {
+                            if let Some(library_items) = &library.items() {
+                                let path_string = &library
+                                    .root_path()
+                                    .clone()
+                                    .into_os_string()
+                                    .into_string()
+                                    .unwrap();
+
+                                egui::CollapsingHeader::new(&path_string)
+                                    .default_open(true)
+                                    .show(ui, |ui| {
+                                        for (key, group) in &library_items
+                                            .iter()
+                                            .filter(|item| item.album().is_some())
+                                            .group_by(|item| item.album())
+                                        {
+                                            let items = group
+                                                .map(|item| (*item).clone())
+                                                .collect::<Vec<LibraryItem>>();
+
+                                            let library_group = egui::CollapsingHeader::new(
+                                                key.unwrap_or("n/a".to_string()),
+                                            )
+                                            .default_open(false)
+                                            .selectable(true)
+                                            .show(ui, |ui| {
+                                                for item in &items {
+                                                    let item_label = ui.add(
+                                                        egui::Label::new(item.title().unwrap())
+                                                            .sense(egui::Sense::click()),
+                                                    );
+
+                                                    if item_label.double_clicked() {
+                                                        if let Some(current_playlist_idx) =
+                                                            &self.current_playlist_idx
+                                                        {
+                                                            let current_playlist = &mut self
+                                                                .playlists[*current_playlist_idx];
+                                                            let track = Track {
+                                                                path: item.path().clone(),
+                                                            };
+                                                            current_playlist.add(track);
+                                                        }
+                                                    }
+                                                }
+                                            });
+
+                                            if let Some(current_playlist_idx) =
+                                                &self.current_playlist_idx
+                                            {
+                                                let current_playlist =
+                                                    &mut self.playlists[*current_playlist_idx];
+
+                                                if library_group.header_response.double_clicked() {
+                                                    for item in items {
+                                                        let track = Track {
+                                                            path: item.path().clone(),
+                                                        };
+                                                        current_playlist.add(track);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                            }
+                        }
+                    });
+                });
         });
 
         self.main_window(ctx);
@@ -39,7 +121,7 @@ impl epi::App for AppState {
 
 impl AppState {
     fn main_window(&mut self, ctx: &egui::CtxRef) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ctx, |_ui| {
             egui::TopBottomPanel::top("Playlist Tabs").show(ctx, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     for (idx, playlist) in self.playlists.iter().enumerate() {
@@ -144,12 +226,12 @@ impl AppState {
 
             let mut volume = self.player.volume;
             ui.add(
-                egui::Slider::new(&mut volume, (0.0 as f32)..=(10.0 as f32))
+                egui::Slider::new(&mut volume, (0.0 as f32)..=(5.0 as f32))
                     .logarithmic(false)
                     .show_value(false)
-                    .clamp_to_range(true)
+                    .clamp_to_range(true),
             );
-           self.player.set_volume(volume);
+            self.player.set_volume(volume);
 
             if let Some(selected_track) = &self.player.selected_track {
                 ui.label("Track State: ");
@@ -170,11 +252,13 @@ impl AppState {
                 }
 
                 if prev_btn.clicked() {
-                    self.player.previous(&self.playlists[(self.current_playlist_idx).unwrap()])
+                    self.player
+                        .previous(&self.playlists[(self.current_playlist_idx).unwrap()])
                 }
-                
+
                 if next_btn.clicked() {
-                    self.player.next(&self.playlists[(self.current_playlist_idx).unwrap()])
+                    self.player
+                        .next(&self.playlists[(self.current_playlist_idx).unwrap()])
                 }
             }
         });
@@ -193,6 +277,7 @@ fn main() {
         playlists: Vec::new(),
         current_playlist_idx: None,
         playlist_idx_to_remove: None,
+        library: None,
     };
 
     let mut window_options = eframe::NativeOptions::default();

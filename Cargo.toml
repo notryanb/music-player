@@ -6,7 +6,10 @@ edition = "2021"
 
 [dependencies]
 eframe = "0.15.0"
+id3 = "0.6"
+itertools = "0.10"
 rfd = "0.6"
 rodio = "0.14.0"
 tracing = "0.1.29"
 tracing-subscriber = "0.3.3"
+walkdir = "2"
