@@ -30,8 +30,6 @@ impl epi::App for AppState {
                 .default_width(250.0)
                 .show(ctx, |ui| {
                     egui::ScrollArea::vertical().show(ui, |ui| {
-                        ui.label("music library");
-
                         if ui.button("Add Library path").clicked() {
                             if let Some(lib_path) = rfd::FileDialog::new().pick_folder() {
                                 tracing::info!("adding library path...");
@@ -43,35 +41,42 @@ impl epi::App for AppState {
 
                         if let Some(library) = &self.library {
                             if let Some(library_items) = &library.items() {
-                                let path_string = &library
+                                let root_path_string = &library
                                     .root_path()
                                     .clone()
                                     .into_os_string()
                                     .into_string()
                                     .unwrap();
 
-                                egui::CollapsingHeader::new(egui::RichText::new(path_string))
+                                egui::CollapsingHeader::new(egui::RichText::new(root_path_string))
                                     .default_open(true)
                                     .show(ui, |ui| {
-                                        for (key, group) in &library_items
-                                            .iter()
-                                            .filter(|item| item.album().is_some())
-                                            .group_by(|item| item.album())
+                                        let mut library_items_clone = library_items.clone();
+
+                                        // In order for group by to work from itertools, items must be consecutive, so sort them first.
+                                        library_items_clone.sort_by_key(|item| item.album());
+
+                                        for (key, group) in
+                                            &library_items_clone.into_iter().group_by(|item| {
+                                                item.album().unwrap_or("?".to_string()).to_string()
+                                            })
                                         {
                                             let items = group
-                                                .map(|item| (*item).clone())
+                                                .map(|item| item.clone())
                                                 .collect::<Vec<LibraryItem>>();
 
                                             let library_group = egui::CollapsingHeader::new(
-                                                key.unwrap_or("n/a".to_string()),
+                                                egui::RichText::new(key),
                                             )
                                             .default_open(false)
                                             .selectable(true)
                                             .show(ui, |ui| {
                                                 for item in &items {
                                                     let item_label = ui.add(
-                                                        egui::Label::new(egui::RichText::new(item.title().unwrap()))
-                                                            .sense(egui::Sense::click()),
+                                                        egui::Label::new(egui::RichText::new(
+                                                            item.title().unwrap_or("?".to_string()),
+                                                        ))
+                                                        .sense(egui::Sense::click()),
                                                     );
 
                                                     if item_label.double_clicked() {
@@ -179,8 +184,10 @@ impl AppState {
 
                     for track in self.playlists[*current_playlist_idx].tracks.iter() {
                         let track_item = ui.add(
-                            egui::Label::new(egui::RichText::new(track.path.clone().into_os_string().into_string().unwrap()))
-                                .sense(egui::Sense::click()),
+                            egui::Label::new(egui::RichText::new(
+                                track.path.clone().into_os_string().into_string().unwrap(),
+                            ))
+                            .sense(egui::Sense::click()),
                         );
 
                         if track_item.double_clicked() {
@@ -238,7 +245,14 @@ impl AppState {
                 ui.label(egui::RichText::new("Track State: "));
                 ui.monospace(egui::RichText::new(self.player.track_state.to_string()));
 
-                ui.label(egui::RichText::new(&selected_track.path.clone().into_os_string().into_string().unwrap()));
+                ui.label(egui::RichText::new(
+                    &selected_track
+                        .path
+                        .clone()
+                        .into_os_string()
+                        .into_string()
+                        .unwrap(),
+                ));
 
                 if stop_btn.clicked() {
                     self.player.stop();

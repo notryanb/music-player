@@ -30,11 +30,11 @@ impl Library {
 
             let library_item = match tag {
                 Ok(tag) => LibraryItem::new(entry.path().to_path_buf())
-                    .set_title(tag.title().unwrap_or("?").to_string())
-                    .set_artist(tag.artist().unwrap_or("?").to_string())
-                    .set_album(tag.album().unwrap_or("?").to_string())
-                    .set_year(tag.year().unwrap_or(0))
-                    .set_genre(tag.genre().unwrap_or("?").to_string()),
+                    .set_title(tag.title())
+                    .set_artist(tag.artist())
+                    .set_album(tag.album())
+                    .set_year(tag.year())
+                    .set_genre(tag.genre()),
                 Err(_err) => {
                     tracing::warn!("Couldn't parse to id3: {:?}", &entry.path());
                     LibraryItem::new(entry.path().to_path_buf())
@@ -82,8 +82,11 @@ impl LibraryItem {
         self.path.clone()
     }
 
-    pub fn set_title(&mut self, title: String) -> Self {
-        self.title = Some(title);
+    pub fn set_title(&mut self, title: Option<&str>) -> Self {
+        if let Some(title) = title {
+            self.title = Some(title.to_string());
+        }
+
         self.to_owned()
     }
 
@@ -91,8 +94,10 @@ impl LibraryItem {
         self.title.clone()
     }
 
-    pub fn set_artist(&mut self, artist: String) -> Self {
-        self.artist = Some(artist);
+    pub fn set_artist(&mut self, artist: Option<&str>) -> Self {
+        if let Some(artist) = artist {
+            self.artist = Some(artist.to_string());
+        }
         self.to_owned()
     }
 
@@ -100,8 +105,10 @@ impl LibraryItem {
         self.artist.clone()
     }
 
-    pub fn set_album(&mut self, album: String) -> Self {
-        self.album = Some(album);
+    pub fn set_album(&mut self, album: Option<&str>) -> Self {
+        if let Some(album) = album {
+            self.album = Some(album.to_string());
+        }
         self.to_owned()
     }
 
@@ -109,8 +116,8 @@ impl LibraryItem {
         self.album.clone()
     }
 
-    pub fn set_year(&mut self, year: i32) -> Self {
-        self.year = Some(year);
+    pub fn set_year(&mut self, year: Option<i32>) -> Self {
+        self.year = year;
         self.to_owned()
     }
 
@@ -118,8 +125,10 @@ impl LibraryItem {
         self.year.clone()
     }
 
-    pub fn set_genre(&mut self, genre: String) -> Self {
-        self.genre = Some(genre);
+    pub fn set_genre(&mut self, genre: Option<&str>) -> Self {
+        if let Some(genre) = genre {
+            self.genre = Some(genre.to_string());
+        }
         self.to_owned()
     }
 
