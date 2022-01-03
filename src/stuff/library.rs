@@ -56,7 +56,7 @@ impl Library {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LibraryItem {
     path: PathBuf,
     title: Option<String>,

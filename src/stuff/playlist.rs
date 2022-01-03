@@ -1,14 +1,13 @@
+use crate::stuff::library::LibraryItem;
 use std::path::PathBuf;
 
-// TODO - Stop all the clonin'!
 #[derive(Debug, Clone)]
 pub struct Playlist {
     name: Option<String>,
-    pub tracks: Vec<Track>,
-    pub selected: Option<Track>,
+    pub tracks: Vec<LibraryItem>,
+    pub selected: Option<LibraryItem>,
 }
 
-// TODO impl a builder pattern?
 impl Playlist {
     pub fn new() -> Self {
         Self {
@@ -26,7 +25,7 @@ impl Playlist {
         self.name.clone()
     }
 
-    pub fn add(&mut self, track: Track) {
+    pub fn add(&mut self, track: LibraryItem) {
         self.tracks.push(track);
     }
 
@@ -46,15 +45,9 @@ impl Playlist {
         self.selected = Some(self.tracks[idx].clone());
     }
 
-    pub fn get_pos(&self, track: &Track) -> Option<usize> {
+    pub fn get_pos(&self, track: &LibraryItem) -> Option<usize> {
         self.tracks.iter().position(|t| t == track)
     }
-}
-
-// TODO - Probably shouldn't hold the actual bytes, but borrowed tag information after the file is opened.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Track {
-    pub path: PathBuf,
 }
 
 #[cfg(test)]
@@ -82,9 +75,7 @@ mod tests {
 
     #[test]
     fn add_track_to_playlist() {
-        let track = Track {
-            path: PathBuf::from(r"C:\music\song.mp3"),
-        };
+        let track = LibraryItem::new(PathBuf::from(r"C:\music\song.mp3"));
 
         let mut playlist = Playlist::new();
         playlist.add(track);
@@ -101,15 +92,9 @@ mod tests {
         let mut playlist = Playlist {
             name: Some("test".to_string()),
             tracks: vec![
-                Track {
-                    path: path1.clone(),
-                },
-                Track {
-                    path: path2.clone(),
-                },
-                Track {
-                    path: path3.clone(),
-                },
+                LibraryItem::new(path1.clone()),
+                LibraryItem::new(path2.clone()),
+                LibraryItem::new(path3.clone()),
             ],
             selected: None,
         };
@@ -119,8 +104,8 @@ mod tests {
         playlist.remove(1);
 
         assert_eq!(playlist.tracks.len(), 2);
-        assert_eq!(playlist.tracks.first().unwrap().path, path1);
-        assert_eq!(playlist.tracks.last().unwrap().path, path3);
+        assert_eq!(playlist.tracks.first().unwrap().path(), path1);
+        assert_eq!(playlist.tracks.last().unwrap().path(), path3);
     }
 
     #[test]
@@ -132,15 +117,9 @@ mod tests {
         let mut playlist = Playlist {
             name: Some("test".to_string()),
             tracks: vec![
-                Track {
-                    path: path1.clone(),
-                },
-                Track {
-                    path: path2.clone(),
-                },
-                Track {
-                    path: path3.clone(),
-                },
+                LibraryItem::new(path1.clone()),
+                LibraryItem::new(path2.clone()),
+                LibraryItem::new(path3.clone()),
             ],
             selected: None,
         };
@@ -150,22 +129,16 @@ mod tests {
         playlist.reorder(0, 2);
 
         assert_eq!(playlist.tracks.len(), 3);
-        assert_eq!(playlist.tracks[0].path, path2);
-        assert_eq!(playlist.tracks[1].path, path3);
-        assert_eq!(playlist.tracks[2].path, path1);
+        assert_eq!(playlist.tracks[0].path(), path2);
+        assert_eq!(playlist.tracks[1].path(), path3);
+        assert_eq!(playlist.tracks[2].path(), path1);
     }
 
     #[test]
     fn select_track() {
-        let track1 = Track {
-            path: PathBuf::from(r"C:\music\song1.mp3"),
-        };
-        let track2 = Track {
-            path: PathBuf::from(r"C:\music\song2.mp3"),
-        };
-        let track3 = Track {
-            path: PathBuf::from(r"C:\music\song3.mp3"),
-        };
+        let track1 = LibraryItem::new(PathBuf::from(r"C:\music\song1.mp3"));
+        let track2 = LibraryItem::new(PathBuf::from(r"C:\music\song2.mp3"));
+        let track3 = LibraryItem::new(PathBuf::from(r"C:\music\song3.mp3"));
 
         let mut playlist = Playlist {
             name: Some("test".to_string()),

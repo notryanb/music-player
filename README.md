@@ -26,26 +26,28 @@ It is not meant to be used as a serious audio player.
 - [x] Reference playlists by index or actual reference (not a clone...), so info is not lost when changing playlist context
 - [x] Double clicking track automatically starts to play it.
 - [x] Remove playlists.
-- [ ] Remove tracks from playlist.
-- [ ] Reorder items in playlist.
-- [ ] Save playlists.
-- [ ] Selected track is highlighted.
+- [x] Un-named playlists get `(idx)` appended 
+- [x] Playlist tab section stacks playlist tabs when they don't fit.
 - [x] Add Next and Previous controls
 - [x] Pause is a toggle
 - [x] Play restarts the track
-- [ ] Add player indicators next to the track
 - [x] Add volume control slider
-- [ ] Save app state on close.
-- [ ] Set currently playing track as app Title
-- [ ] Stop with all the cloning... seriously. Everything is cloned.
-- [ ] Handle files which can't be decoded correctly into audio. 
 - [x] Implement library
-- [ ] Implement library search.
+- [x] Refactor so the items parsed in the library are the primary data type passed around instead of separate library items and tracks.
+- [ ] Selected track is highlighted.
+- [ ] Set currently playing track as app Title
+- [ ] Display playlist as a table [Playing, Track #, Artist, Album Title, etc... ]
+- [ ] Add player indicators next to the track
 - [ ] Playlist plays to end after track is selected.
-- [x] Un-named playlists get `(idx)` appended 
-- [x] Playlist tab section stacks playlist tabs when they don't fit.
+- [ ] Remove tracks from playlist.
+- [ ] Reorder items in playlist.
+- [ ] Save playlists.
+- [ ] Save app state on close.
+- [ ] Handle files which can't be decoded correctly into audio. 
+- [ ] Implement library search.
 - [ ] Differentiate between a selected track and the currently playing one.
-- [ ] Refactor so the items parsed in the library are the primary data type passed around instead of separate library items and tracks.
 - [ ] Library display options [ album, artist, year, genre, folder structure, etc...]
-- [ ] Improve library build performance
+- [ ] Improve library build performance and probably offload to a non-ui thread.
 - [ ] Library Item hashable?
+- [ ] Refactor into more sensible responsibilities.
+- [ ] Stop with all the cloning... seriously. Everything is cloned.
