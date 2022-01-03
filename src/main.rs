@@ -15,7 +15,17 @@ struct AppState {
 }
 
 impl epi::App for AppState {
-    fn update(&mut self, ctx: &egui::CtxRef, _frame: &epi::Frame) {
+    fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
+        if let Some(selected_track) = &self.player.selected_track {
+            let display = format!(
+                "{} - {} [ Music Player ]",
+                &selected_track.artist().unwrap_or("?".to_string()),
+                &selected_track.title().unwrap_or("?".to_string())
+            );
+
+            frame.set_window_title(&display);
+        }
+
         egui::TopBottomPanel::top("MusicPlayer").show(ctx, |ui| {
             ui.label("Welcome to MusicPlayer!");
         });
@@ -85,11 +95,8 @@ impl epi::App for AppState {
                                                         {
                                                             let current_playlist = &mut self
                                                                 .playlists[*current_playlist_idx];
-                                                            let track = LibraryItem::new(
-                                                                item.path().clone(),
-                                                            );
 
-                                                            current_playlist.add(track);
+                                                            current_playlist.add(item.clone());
                                                         }
                                                     }
                                                 }
@@ -103,9 +110,7 @@ impl epi::App for AppState {
 
                                                 if library_group.header_response.double_clicked() {
                                                     for item in items {
-                                                        let track =
-                                                            LibraryItem::new(item.path().clone());
-                                                        current_playlist.add(track);
+                                                        current_playlist.add(item.clone());
                                                     }
                                                 }
                                             }
@@ -137,16 +142,12 @@ impl AppState {
                         );
 
                         if playlist_tab.clicked() {
-                            tracing::info!("playlist tab was clicked");
                             self.current_playlist_idx = Some(idx);
                         }
 
+                        // TODO - make this bring up a context menu, however just delete for
+                        // now.
                         if playlist_tab.clicked_by(egui::PointerButton::Secondary) {
-                            tracing::info!("Right clicked the playlist tab idx {}", idx);
-
-                            // TODO - make this bring up a context menu, however just delete for
-                            // now.
-
                             self.playlist_idx_to_remove = Some(idx);
                         }
                     }
@@ -177,7 +178,6 @@ impl AppState {
                 if let Some(current_playlist_idx) = &mut self.current_playlist_idx {
                     if ui.button("Add file to playlist").clicked() {
                         if let Some(path) = rfd::FileDialog::new().pick_file() {
-                            tracing::debug!("Adding file to playlist");
                             self.playlists[*current_playlist_idx].add(LibraryItem::new(path));
                         }
                     }
