@@ -35,9 +35,9 @@ It is not meant to be used as a serious audio player.
 - [x] Implement library
 - [x] Refactor so the items parsed in the library are the primary data type passed around instead of separate library items and tracks.
 - [x] Set currently playing track as app Title
+- [x] Display playlist as a table [Playing, Track #, Artist, Album Title, etc... ]
+- [x] Add player indicators next to the track
 - [ ] Selected track is highlighted.
-- [ ] Display playlist as a table [Playing, Track #, Artist, Album Title, etc... ]
-- [ ] Add player indicators next to the track
 - [ ] Add toolbar with File, Properties, Help, etc...
 - [ ] Playlist plays to end after track is selected.
 - [ ] Remove tracks from playlist.

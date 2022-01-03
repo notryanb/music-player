@@ -36,10 +36,9 @@ impl epi::App for AppState {
 
         egui::CentralPanel::default().show(ctx, |_ui| {
             egui::SidePanel::left("Library Window")
-                .min_width(200.)
                 .default_width(250.0)
                 .show(ctx, |ui| {
-                    egui::ScrollArea::vertical().show(ui, |ui| {
+                    egui::ScrollArea::both().show(ui, |ui| {
                         if ui.button("Add Library path").clicked() {
                             if let Some(lib_path) = rfd::FileDialog::new().pick_folder() {
                                 tracing::info!("adding library path...");
@@ -176,31 +175,63 @@ impl AppState {
             // Playlist contents
             egui::CentralPanel::default().show(ctx, |ui| {
                 if let Some(current_playlist_idx) = &mut self.current_playlist_idx {
-                    if ui.button("Add file to playlist").clicked() {
-                        if let Some(path) = rfd::FileDialog::new().pick_file() {
-                            self.playlists[*current_playlist_idx].add(LibraryItem::new(path));
-                        }
-                    }
-
-                    for track in self.playlists[*current_playlist_idx].tracks.iter() {
-                        let track_item = ui.add(
-                            egui::Label::new(egui::RichText::new(
-                                track.path().clone().into_os_string().into_string().unwrap(),
-                            ))
-                            .sense(egui::Sense::click()),
-                        );
-
-                        if track_item.double_clicked() {
-                            self.player.selected_track = Some(track.clone());
-                            self.player.play();
-                        }
-
-                        if track_item.clicked() {
-                            self.player.selected_track = Some(track.clone());
-                        }
-                    }
+                    self.playlist_table(ui);
                 }
             });
+        });
+    }
+
+    fn playlist_table(&mut self, ui: &mut egui::Ui) {
+        egui::ScrollArea::both().show(ui, |ui| {
+            if let Some(current_playlist_idx) = &mut self.current_playlist_idx {
+                egui::Grid::new("playlist")
+                    .striped(true)
+                    .min_col_width(25.)
+                    .show(ui, |ui| {
+                        // Header
+                        ui.label("Playing");
+                        ui.label("#");
+                        ui.label("Artist");
+                        ui.label("Album");
+                        ui.label("Title");
+                        ui.label("Genre");
+                        ui.end_row();
+
+                        // Rows
+                        for track in self.playlists[*current_playlist_idx].tracks.iter() {
+                            if let Some(selected_track) = &self.player.selected_track {
+                                if selected_track == track {
+                                    ui.label("▶".to_string());
+                                } else {
+                                    ui.label(" ".to_string());
+                                }
+                            } else {
+                                ui.label(" ".to_string());
+                            }
+
+                            ui.label("0".to_string());
+
+                            let artist_label = ui.add(egui::Label::new(&track.artist().unwrap_or("?".to_string())).sense(egui::Sense::click()));
+
+                            ui.label(&track.album().unwrap_or("?".to_string()));
+                            ui.label(&track.title().unwrap_or("?".to_string()));
+                            ui.label(&track.genre().unwrap_or("?".to_string()));
+
+                            // Temporary hack because I don't yet know how to treat an entire Row
+                            // as a response
+                            if artist_label.double_clicked() {
+                                self.player.selected_track = Some(track.clone());
+                                self.player.play();
+                            }
+
+                            if artist_label.clicked() {
+                                self.player.selected_track = Some(track.clone());
+                            }
+
+                            ui.end_row();
+                        }
+                    });
+            }
         });
     }
 
