@@ -4,7 +4,7 @@ use itertools::Itertools;
 mod stuff;
 use crate::stuff::library::{Library, LibraryItem};
 use crate::stuff::player::Player;
-use crate::stuff::playlist::{Playlist, Track};
+use crate::stuff::playlist::Playlist;
 
 struct AppState {
     pub player: Player,
@@ -85,9 +85,10 @@ impl epi::App for AppState {
                                                         {
                                                             let current_playlist = &mut self
                                                                 .playlists[*current_playlist_idx];
-                                                            let track = Track {
-                                                                path: item.path().clone(),
-                                                            };
+                                                            let track = LibraryItem::new(
+                                                                item.path().clone(),
+                                                            );
+
                                                             current_playlist.add(track);
                                                         }
                                                     }
@@ -102,9 +103,8 @@ impl epi::App for AppState {
 
                                                 if library_group.header_response.double_clicked() {
                                                     for item in items {
-                                                        let track = Track {
-                                                            path: item.path().clone(),
-                                                        };
+                                                        let track =
+                                                            LibraryItem::new(item.path().clone());
                                                         current_playlist.add(track);
                                                     }
                                                 }
@@ -178,26 +178,24 @@ impl AppState {
                     if ui.button("Add file to playlist").clicked() {
                         if let Some(path) = rfd::FileDialog::new().pick_file() {
                             tracing::debug!("Adding file to playlist");
-                            self.playlists[*current_playlist_idx].add(Track { path });
+                            self.playlists[*current_playlist_idx].add(LibraryItem::new(path));
                         }
                     }
 
                     for track in self.playlists[*current_playlist_idx].tracks.iter() {
                         let track_item = ui.add(
                             egui::Label::new(egui::RichText::new(
-                                track.path.clone().into_os_string().into_string().unwrap(),
+                                track.path().clone().into_os_string().into_string().unwrap(),
                             ))
                             .sense(egui::Sense::click()),
                         );
 
                         if track_item.double_clicked() {
-                            tracing::debug!("Double clicked {:?}", &track.path);
                             self.player.selected_track = Some(track.clone());
                             self.player.play();
                         }
 
                         if track_item.clicked() {
-                            tracing::debug!("Clicked {:?}", &track.path);
                             self.player.selected_track = Some(track.clone());
                         }
                     }
@@ -247,7 +245,7 @@ impl AppState {
 
                 ui.label(egui::RichText::new(
                     &selected_track
-                        .path
+                        .path()
                         .clone()
                         .into_os_string()
                         .into_string()

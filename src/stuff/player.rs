@@ -1,8 +1,9 @@
-use crate::stuff::playlist::{Playlist, Track};
+use crate::stuff::library::LibraryItem;
+use crate::stuff::playlist::Playlist;
 
 pub struct Player {
     pub track_state: TrackState,
-    pub selected_track: Option<Track>,
+    pub selected_track: Option<LibraryItem>,
     pub sink: rodio::Sink,
     pub stream_handle: rodio::OutputStreamHandle,
     pub volume: f32,
@@ -32,7 +33,7 @@ impl Player {
     pub fn play(&mut self) {
         if let Some(selected_track) = &self.selected_track {
             let file = std::io::BufReader::new(
-                std::fs::File::open(&selected_track.path).expect("Failed to open file"),
+                std::fs::File::open(&selected_track.path()).expect("Failed to open file"),
             );
             let source = rodio::Decoder::new(file).expect("Failed to decode audio file");
 
