@@ -27,11 +27,93 @@ impl epi::App for AppState {
         }
 
         egui::TopBottomPanel::top("MusicPlayer").show(ctx, |ui| {
-            ui.label("Welcome to MusicPlayer!");
+            egui::menu::bar(ui, |ui| {
+                ui.menu_button("File", |ui| {
+                    ui.button("Open");
+
+                    ui.separator();
+
+                    ui.button("Add Files");
+                    ui.button("Add Folders");
+
+                    ui.separator();
+
+                    if ui.button("New Playlist").clicked() {
+                        let default_name_count = self
+                            .playlists
+                            .iter()
+                            .filter(|pl| pl.get_name().unwrap().starts_with("New Playlist"))
+                            .count();
+                        let playlist_name = match default_name_count {
+                            0 => "New Playlist".to_string(),
+                            _ => format!("New Playlist ({})", default_name_count - 1),
+                        };
+
+                        let mut new_playlist = Playlist::new();
+                        new_playlist.set_name(playlist_name);
+
+                        self.playlists.push(new_playlist.clone());
+                        self.current_playlist_idx = Some(self.playlists.len() - 1);
+                    }
+                    ui.button("Load Playlist");
+                    ui.button("Save Playlist");
+
+                    ui.separator();
+
+                    ui.button("Preferences");
+
+                    ui.separator();
+
+                    if ui.button("Exit").clicked() {
+                        frame.quit();
+                    }
+                });
+
+                ui.menu_button("Edit", |ui| {
+                    ui.button("Remove duplicates");
+                });
+
+                ui.menu_button("Playback", |ui| {
+                    ui.button("Play");
+                    ui.button("Stop");
+                    ui.button("Pause");
+                    ui.button("Next");
+                    ui.button("Previous");
+                });
+
+                ui.menu_button("Library", |ui| {
+                    ui.button("Configure");
+                });
+
+                ui.menu_button("Help", |ui| {
+                    ui.button("About");
+                });
+            });
         });
 
         egui::TopBottomPanel::top("Player stuff").show(ctx, |ui| {
             self.player_ui(ui);
+        });
+
+        egui::TopBottomPanel::bottom("Footer").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                if self.player.is_stopped() {
+                    ui.label("Stopped");
+                } else {
+                    if let Some(selected_track) = &self.player.selected_track {
+                        ui.monospace(egui::RichText::new(self.player.track_state.to_string()));
+
+                        ui.label(egui::RichText::new(
+                            &selected_track
+                                .path()
+                                .clone()
+                                .into_os_string()
+                                .into_string()
+                                .unwrap(),
+                        ));
+                    }
+                }
+            });
         });
 
         egui::CentralPanel::default().show(ctx, |_ui| {
@@ -211,7 +293,10 @@ impl AppState {
 
                             ui.label("0".to_string());
 
-                            let artist_label = ui.add(egui::Label::new(&track.artist().unwrap_or("?".to_string())).sense(egui::Sense::click()));
+                            let artist_label = ui.add(
+                                egui::Label::new(&track.artist().unwrap_or("?".to_string()))
+                                    .sense(egui::Sense::click()),
+                            );
 
                             ui.label(&track.album().unwrap_or("?".to_string()));
                             ui.label(&track.title().unwrap_or("?".to_string()));
@@ -243,24 +328,6 @@ impl AppState {
             let prev_btn = ui.button("|◀");
             let next_btn = ui.button("▶|");
 
-            if ui.button("Create Playlist +").clicked() {
-                let default_name_count = self
-                    .playlists
-                    .iter()
-                    .filter(|pl| pl.get_name().unwrap().starts_with("New Playlist"))
-                    .count();
-                let playlist_name = match default_name_count {
-                    0 => "New Playlist".to_string(),
-                    _ => format!("New Playlist ({})", default_name_count - 1),
-                };
-
-                let mut new_playlist = Playlist::new();
-                new_playlist.set_name(playlist_name);
-
-                self.playlists.push(new_playlist.clone());
-                self.current_playlist_idx = Some(self.playlists.len() - 1);
-            }
-
             let mut volume = self.player.volume;
             ui.add(
                 egui::Slider::new(&mut volume, (0.0 as f32)..=(5.0 as f32))
@@ -271,18 +338,6 @@ impl AppState {
             self.player.set_volume(volume);
 
             if let Some(selected_track) = &self.player.selected_track {
-                ui.label(egui::RichText::new("Track State: "));
-                ui.monospace(egui::RichText::new(self.player.track_state.to_string()));
-
-                ui.label(egui::RichText::new(
-                    &selected_track
-                        .path()
-                        .clone()
-                        .into_os_string()
-                        .into_string()
-                        .unwrap(),
-                ));
-
                 if stop_btn.clicked() {
                     self.player.stop();
                 }
