@@ -72,7 +72,7 @@ impl epi::App for AppState {
                 ui.menu_button("Edit", |ui| {
                     ui.button("Remove duplicates");
                 });
-                
+
                 ui.menu_button("Playback", |ui| {
                     ui.button("Play");
                     ui.button("Stop");
@@ -80,11 +80,11 @@ impl epi::App for AppState {
                     ui.button("Next");
                     ui.button("Previous");
                 });
-                
+
                 ui.menu_button("Library", |ui| {
                     ui.button("Configure");
                 });
-                
+
                 ui.menu_button("Help", |ui| {
                     ui.button("About");
                 });
@@ -115,7 +115,6 @@ impl epi::App for AppState {
                 }
             });
         });
-        
 
         egui::CentralPanel::default().show(ctx, |_ui| {
             egui::SidePanel::left("Library Window")
@@ -205,8 +204,6 @@ impl epi::App for AppState {
         });
 
         self.main_window(ctx);
-
-
     }
 
     fn name(&self) -> &str {
@@ -296,7 +293,10 @@ impl AppState {
 
                             ui.label("0".to_string());
 
-                            let artist_label = ui.add(egui::Label::new(&track.artist().unwrap_or("?".to_string())).sense(egui::Sense::click()));
+                            let artist_label = ui.add(
+                                egui::Label::new(&track.artist().unwrap_or("?".to_string()))
+                                    .sense(egui::Sense::click()),
+                            );
 
                             ui.label(&track.album().unwrap_or("?".to_string()));
                             ui.label(&track.title().unwrap_or("?".to_string()));
@@ -338,7 +338,6 @@ impl AppState {
             self.player.set_volume(volume);
 
             if let Some(selected_track) = &self.player.selected_track {
-
                 if stop_btn.clicked() {
                     self.player.stop();
                 }
