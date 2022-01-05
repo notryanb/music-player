@@ -20,6 +20,13 @@ impl Player {
         }
     }
 
+    pub fn is_stopped(&self) -> bool {
+        match self.track_state {
+            TrackState::Stopped => true,
+            _ => false,
+        }
+    }
+
     pub fn stop(&mut self) {
         match &self.track_state {
             TrackState::Playing | TrackState::Paused => {
