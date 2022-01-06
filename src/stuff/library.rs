@@ -139,7 +139,6 @@ impl LibraryItem {
         self.genre.clone()
     }
 
-
     pub fn set_track_number(&mut self, track_number: Option<u32>) -> Self {
         self.track_number = track_number;
         self.to_owned()

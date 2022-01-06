@@ -88,17 +88,19 @@ impl epi::App for AppState {
                         if stop_btn.clicked() {
                             self.player.stop();
                         }
-                        
+
                         if pause_btn.clicked() {
                             self.player.pause();
                         }
 
                         if next_btn.clicked() {
-                            self.player.next(&self.playlists[(self.current_playlist_idx).unwrap()])
+                            self.player
+                                .next(&self.playlists[(self.current_playlist_idx).unwrap()])
                         }
 
                         if prev_btn.clicked() {
-                            self.player.previous(&self.playlists[(self.current_playlist_idx).unwrap()])
+                            self.player
+                                .previous(&self.playlists[(self.current_playlist_idx).unwrap()])
                         }
                     }
                 });
