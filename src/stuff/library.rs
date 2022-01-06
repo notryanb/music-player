@@ -2,11 +2,24 @@ use id3::Tag;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
+//#[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
 #[derive(Debug, Clone)]
 pub struct Library {
     root_path: PathBuf,
     items: Option<Vec<LibraryItem>>,
 }
+
+/*
+impl Default for Library {
+    pub fn default() -> Self {
+        Self {
+            Pathbuf::from(""),
+            items: None,
+        }
+    }
+}
+*/
 
 impl Library {
     pub fn new(root_path: PathBuf) -> Self {
@@ -57,6 +70,7 @@ impl Library {
     }
 }
 
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LibraryItem {
     path: PathBuf,

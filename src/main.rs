@@ -6,15 +6,80 @@ use crate::stuff::library::{Library, LibraryItem};
 use crate::stuff::player::Player;
 use crate::stuff::playlist::Playlist;
 
+
+/// We derive Deserialize/Serialize so we can persist app state on shutdown.
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
 struct AppState {
+    #[cfg_attr(feature = "persistence", serde(skip))]
     pub player: Player,
+
     pub playlists: Vec<Playlist>,
+
     pub current_playlist_idx: Option<usize>,
+
+    #[cfg_attr(feature = "persistence", serde(skip))]
     pub playlist_idx_to_remove: Option<usize>,
+
     pub library: Option<Library>,
 }
 
+impl Default for AppState {
+    fn default() -> Self {
+        let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+        let sink = rodio::Sink::try_new(&stream_handle).unwrap();
+
+        Self {
+            player: Player::new(sink, stream_handle),
+            playlists: Vec::new(),
+            current_playlist_idx: None,
+            playlist_idx_to_remove: None,
+            library: None,
+        }
+    }
+}
+
 impl epi::App for AppState {
+    /// Called once before the first frame.
+    fn setup(
+        &mut self,
+        _ctx: &egui::CtxRef,
+        _frame: &epi::Frame,
+        _storage: Option<&dyn epi::Storage>,
+    ) {
+        // Load previous app state (if any).
+        // Note that you must enable the `persistence` feature for this to work.
+        #[cfg(feature = "persistence")]
+        if let Some(storage) = _storage {
+            /*
+            if let Some(app_state) =  epi::get_value(storage, epi::APP_KEY) {
+                *self = app_state;
+            } else {
+                let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+                let sink = rodio::Sink::try_new(&stream_handle).unwrap();
+
+                let app_state = AppState {
+                    player: Player::new(sink, stream_handle),
+                    playlists: Vec::new(),
+                    current_playlist_idx: None,
+                    playlist_idx_to_remove: None,
+                    library: None,
+                };
+
+                *self = app_state;
+            }
+            */
+            *self = epi::get_value(storage, epi::APP_KEY).unwrap_or_default()
+        }
+    }
+
+    /// Called by the frame work to save state before shutdown.
+    /// Note that you must enable the `persistence` feature for this to work.
+    #[cfg(feature = "persistence")]
+    fn save(&mut self, storage: &mut dyn epi::Storage) {
+        epi::set_value(storage, epi::APP_KEY, self);
+    }
+
     fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
         if let Some(selected_track) = &self.player.selected_track {
             let display = format!(

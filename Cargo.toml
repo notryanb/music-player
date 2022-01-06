@@ -10,6 +10,11 @@ id3 = "0.6"
 itertools = "0.10"
 rfd = "0.6"
 rodio = "0.14"
+serde = { version = "1", features = ["derive"], optional = true }
 tracing = "0.1.29"
 tracing-subscriber = "0.3.3"
 walkdir = "2"
+
+[features]
+default = ["persistence"]
+persistence = ["eframe/persistence", "serde"]

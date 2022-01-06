@@ -1,12 +1,26 @@
 use crate::stuff::library::LibraryItem;
 use std::path::PathBuf;
 
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
+//#[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
 #[derive(Debug, Clone)]
 pub struct Playlist {
     name: Option<String>,
     pub tracks: Vec<LibraryItem>,
     pub selected: Option<LibraryItem>,
 }
+
+/*
+impl Default for Playlist {
+    pub fn default() -> Self {
+        Self {
+            name: None,
+            tracks: vec![],
+            selected: None,
+        }
+    }
+}
+*/
 
 impl Playlist {
     pub fn new() -> Self {
