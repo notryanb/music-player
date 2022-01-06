@@ -34,7 +34,8 @@ impl Library {
                     .set_artist(tag.artist())
                     .set_album(tag.album())
                     .set_year(tag.year())
-                    .set_genre(tag.genre()),
+                    .set_genre(tag.genre())
+                    .set_track_number(tag.track()),
                 Err(_err) => {
                     tracing::warn!("Couldn't parse to id3: {:?}", &entry.path());
                     LibraryItem::new(entry.path().to_path_buf())
@@ -64,6 +65,7 @@ pub struct LibraryItem {
     album: Option<String>,
     year: Option<i32>,
     genre: Option<String>,
+    track_number: Option<u32>,
 }
 
 impl LibraryItem {
@@ -75,6 +77,7 @@ impl LibraryItem {
             album: None,
             year: None,
             genre: None,
+            track_number: None,
         }
     }
 
@@ -134,5 +137,15 @@ impl LibraryItem {
 
     pub fn genre(&self) -> Option<String> {
         self.genre.clone()
+    }
+
+
+    pub fn set_track_number(&mut self, track_number: Option<u32>) -> Self {
+        self.track_number = track_number;
+        self.to_owned()
+    }
+
+    pub fn track_number(&self) -> Option<u32> {
+        self.track_number.clone()
     }
 }

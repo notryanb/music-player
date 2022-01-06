@@ -74,11 +74,33 @@ impl epi::App for AppState {
                 });
 
                 ui.menu_button("Playback", |ui| {
-                    ui.button("Play");
-                    ui.button("Stop");
-                    ui.button("Pause");
-                    ui.button("Next");
-                    ui.button("Previous");
+                    let play_btn = ui.button("Play");
+                    let stop_btn = ui.button("Stop");
+                    let pause_btn = ui.button("Pause");
+                    let next_btn = ui.button("Next");
+                    let prev_btn = ui.button("Previous");
+
+                    if let Some(selected_track) = &self.player.selected_track {
+                        if play_btn.clicked() {
+                            self.player.play();
+                        }
+
+                        if stop_btn.clicked() {
+                            self.player.stop();
+                        }
+                        
+                        if pause_btn.clicked() {
+                            self.player.pause();
+                        }
+
+                        if next_btn.clicked() {
+                            self.player.next(&self.playlists[(self.current_playlist_idx).unwrap()])
+                        }
+
+                        if prev_btn.clicked() {
+                            self.player.previous(&self.playlists[(self.current_playlist_idx).unwrap()])
+                        }
+                    }
                 });
 
                 ui.menu_button("Library", |ui| {
@@ -106,8 +128,11 @@ impl epi::App for AppState {
                         ui.label(egui::RichText::new(
                             &selected_track
                                 .path()
+                                .as_path()
+                                .file_name()
+                                .unwrap()
                                 .clone()
-                                .into_os_string()
+                                .to_os_string()
                                 .into_string()
                                 .unwrap(),
                         ));
@@ -291,7 +316,11 @@ impl AppState {
                                 ui.label(" ".to_string());
                             }
 
-                            ui.label("0".to_string());
+                            if let Some(track_number) = &track.track_number() {
+                                ui.label(&track.track_number().unwrap().to_string());
+                            } else {
+                                ui.label("");
+                            }
 
                             let artist_label = ui.add(
                                 egui::Label::new(&track.artist().unwrap_or("?".to_string()))
