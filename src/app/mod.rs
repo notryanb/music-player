@@ -1,11 +1,11 @@
 use library::{Library, LibraryItem};
 use player::Player;
 use playlist::Playlist;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{fs::File, io::Read, io::Write};
 
-use eframe::{egui};
+use eframe::egui;
 
 mod app;
 mod library;
@@ -19,7 +19,7 @@ pub struct App {
     pub playlists: Vec<Playlist>,
 
     pub current_playlist_idx: Option<usize>,
-    
+
     #[serde(skip_serializing, skip_deserializing)]
     pub player: Option<Player>,
 
@@ -39,14 +39,25 @@ impl Default for App {
     }
 }
 
-impl App {
-    pub fn load() -> Self {
-        let mut saved_state = String::new();
-        let mut file = File::open("./music_player_app.json").unwrap();
-        file.read_to_string(&mut saved_state).unwrap();
+#[derive(Debug, Clone)]
+pub enum TempError {
+    MissingAppState,
+}
 
-        let app = serde_json::from_str(&saved_state).unwrap();
-        app
+impl std::fmt::Display for TempError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Couldn't load app state")
+    }
+}
+
+impl App {
+    pub fn load() -> Result<Self, TempError> {
+        let mut saved_state = String::new();
+        let mut file =
+            File::open("./music_player_app.json").map_err(|_| TempError::MissingAppState)?;
+        file.read_to_string(&mut saved_state)
+            .map_err(|_| TempError::MissingAppState)?;
+        serde_json::from_str(&saved_state).map_err(|_| TempError::MissingAppState)
     }
 
     pub fn save_state(&self) {
@@ -126,7 +137,9 @@ impl App {
 
                         // Rows
                         for track in self.playlists[*current_playlist_idx].tracks.iter() {
-                            if let Some(selected_track) = &self.player.as_ref().unwrap().selected_track {
+                            if let Some(selected_track) =
+                                &self.player.as_ref().unwrap().selected_track
+                            {
                                 if selected_track == track {
                                     ui.label("▶".to_string());
                                 } else {
@@ -200,17 +213,19 @@ impl App {
                 }
 
                 if prev_btn.clicked() {
-                    self.player.as_mut().unwrap()
+                    self.player
+                        .as_mut()
+                        .unwrap()
                         .previous(&self.playlists[(self.current_playlist_idx).unwrap()])
                 }
 
                 if next_btn.clicked() {
-                    self.player.as_mut().unwrap()
+                    self.player
+                        .as_mut()
+                        .unwrap()
                         .next(&self.playlists[(self.current_playlist_idx).unwrap()])
                 }
             }
         });
     }
 }
-
-

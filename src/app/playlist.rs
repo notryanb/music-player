@@ -1,6 +1,6 @@
 use crate::app::LibraryItem;
 //use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Playlist {

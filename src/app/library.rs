@@ -1,7 +1,7 @@
 use id3::Tag;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use walkdir::WalkDir;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Library {

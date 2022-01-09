@@ -2,9 +2,9 @@ use eframe::{egui, epi};
 use itertools::Itertools;
 
 use super::App;
-use crate::app::Playlist;
 use crate::app::Library;
 use crate::app::LibraryItem;
+use crate::app::Playlist;
 
 impl epi::App for App {
     fn on_exit(&mut self) {
@@ -91,12 +91,16 @@ impl epi::App for App {
                         }
 
                         if next_btn.clicked() {
-                            self.player.as_mut().unwrap()
+                            self.player
+                                .as_mut()
+                                .unwrap()
                                 .next(&self.playlists[(self.current_playlist_idx).unwrap()])
                         }
 
                         if prev_btn.clicked() {
-                            self.player.as_mut().unwrap()
+                            self.player
+                                .as_mut()
+                                .unwrap()
                                 .previous(&self.playlists[(self.current_playlist_idx).unwrap()])
                         }
                     }
@@ -122,7 +126,9 @@ impl epi::App for App {
                     ui.label("Stopped");
                 } else {
                     if let Some(selected_track) = &self.player.as_ref().unwrap().selected_track {
-                        ui.monospace(egui::RichText::new(self.player.as_ref().unwrap().track_state.to_string()));
+                        ui.monospace(egui::RichText::new(
+                            self.player.as_ref().unwrap().track_state.to_string(),
+                        ));
 
                         ui.label(egui::RichText::new(
                             &selected_track
@@ -234,4 +240,3 @@ impl epi::App for App {
         "Music Player"
     }
 }
-
