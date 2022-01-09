@@ -1,7 +1,8 @@
-use crate::stuff::library::LibraryItem;
-use std::path::PathBuf;
+use crate::app::LibraryItem;
+//use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Playlist {
     name: Option<String>,
     pub tracks: Vec<LibraryItem>,

@@ -1,5 +1,5 @@
-use crate::stuff::library::LibraryItem;
-use crate::stuff::playlist::Playlist;
+use crate::app::library::LibraryItem;
+use crate::app::playlist::Playlist;
 
 pub struct Player {
     pub track_state: TrackState,

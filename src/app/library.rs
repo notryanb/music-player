@@ -1,8 +1,9 @@
 use id3::Tag;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Library {
     root_path: PathBuf,
     items: Option<Vec<LibraryItem>>,
@@ -57,7 +58,7 @@ impl Library {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LibraryItem {
     path: PathBuf,
     title: Option<String>,
