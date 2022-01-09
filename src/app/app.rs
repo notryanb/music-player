@@ -7,6 +7,11 @@ use crate::app::Library;
 use crate::app::LibraryItem;
 
 impl epi::App for App {
+    fn on_exit(&mut self) {
+        tracing::info!("exiting and saving");
+        self.save_state();
+    }
+
     fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
         if let Some(selected_track) = &self.player.as_mut().unwrap().selected_track {
             let display = format!(

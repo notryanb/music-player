@@ -49,7 +49,7 @@ impl App {
         app
     }
 
-    pub fn save(&self) {
+    pub fn save_state(&self) {
         let config = serde_json::to_string(&self).unwrap();
         let location = "./music_player_app.json";
 

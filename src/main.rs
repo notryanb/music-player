@@ -12,23 +12,21 @@ fn main() {
     let sink = rodio::Sink::try_new(&stream_handle).unwrap();
     let player = Player::new(sink, stream_handle);
 
+    let mut app = App::load();
+    app.player = Some(player);
+
+
     /*
-
-    let mut app = App::load().unwrap_or_default();
-    app.set_player(player);
-    */
-
-
-    let app_state = App {
+    let app = App {
         player: Some(player),
         playlists: Vec::new(),
         current_playlist_idx: None,
         playlist_idx_to_remove: None,
         library: None,
     };
-
+    */
 
     let mut window_options = eframe::NativeOptions::default();
     window_options.initial_window_size = Some(egui::Vec2::new(1024., 768.));
-    eframe::run_native(Box::new(app_state), window_options);
+    eframe::run_native(Box::new(app), window_options);
 }
