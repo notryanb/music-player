@@ -6,10 +6,20 @@ use crate::stuff::library::{Library, LibraryItem};
 use crate::stuff::player::Player;
 use crate::stuff::playlist::Playlist;
 
+use rodio::cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use rodio::cpal::{Data, Sample, SampleFormat};
+
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::thread;
+
+
+// IDEA
+// Seeing as how the UI thread seems to be ending the stream,
+// lets try creating a new thread, then inside it we will create the audio thread.
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
+//#[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
 struct AppState {
     #[cfg_attr(feature = "persistence", serde(skip))]
     pub player: Player,
@@ -22,11 +32,20 @@ struct AppState {
     pub playlist_idx_to_remove: Option<usize>,
 
     pub library: Option<Library>,
+    
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    pub sink: Option<rodio::Sink>,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    pub stream_handle: Option<rodio::OutputStreamHandle>,
 }
 
 impl Default for AppState {
     fn default() -> Self {
-        let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+        let audio_host = rodio::cpal::default_host();
+        let audio_device = audio_host.default_output_device().expect("failed to get default output device");
+        tracing::info!("Default - Audio Device Name: {}", &audio_device.name().unwrap_or("failed to obtain device name".to_string()));
+
+        let (_stream, stream_handle) = rodio::OutputStream::try_from_device(&audio_device).unwrap();
         let sink = rodio::Sink::try_new(&stream_handle).unwrap();
 
         Self {
@@ -51,24 +70,7 @@ impl epi::App for AppState {
         // Note that you must enable the `persistence` feature for this to work.
         #[cfg(feature = "persistence")]
         if let Some(storage) = _storage {
-            /*
-            if let Some(app_state) =  epi::get_value(storage, epi::APP_KEY) {
-                *self = app_state;
-            } else {
-                let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
-                let sink = rodio::Sink::try_new(&stream_handle).unwrap();
-
-                let app_state = AppState {
-                    player: Player::new(sink, stream_handle),
-                    playlists: Vec::new(),
-                    current_playlist_idx: None,
-                    playlist_idx_to_remove: None,
-                    library: None,
-                };
-
-                *self = app_state;
-            }
-            */
+            tracing::info!("Storate found");
             *self = epi::get_value(storage, epi::APP_KEY).unwrap_or_default()
         }
     }
@@ -81,6 +83,19 @@ impl epi::App for AppState {
     }
 
     fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
+        let audio_host = rodio::cpal::default_host();
+        let audio_device = audio_host.default_output_device().expect("failed to get default output device");
+        let (_stream, stream_handle) = rodio::OutputStream::try_from_device(&audio_device).unwrap();
+        let sink = rodio::Sink::try_new(&stream_handle).unwrap();
+        //&self.player.set_sink_and_stream(sink, stream_handle);
+        //&self.player.set_stream_handle(stream_handle);
+        //&self.player.set_sink(sink);
+        self.stream_handle = Some(stream_handle);
+        self.sink = Some(sink);
+
+
+        //tracing::info!("Player Sink Len: {}", &self.player.sink_len());
+
         if let Some(selected_track) = &self.player.selected_track {
             let display = format!(
                 "{} - {} [ Music Player ]",
@@ -147,25 +162,25 @@ impl epi::App for AppState {
 
                     if let Some(selected_track) = &self.player.selected_track {
                         if play_btn.clicked() {
-                            self.player.play();
+                            self.player.play(self.sink.as_ref().unwrap());
                         }
 
                         if stop_btn.clicked() {
-                            self.player.stop();
+                            self.player.stop(self.sink.as_ref().unwrap());
                         }
 
                         if pause_btn.clicked() {
-                            self.player.pause();
+                            self.player.pause(self.sink.as_ref().unwrap());
                         }
 
                         if next_btn.clicked() {
                             self.player
-                                .next(&self.playlists[(self.current_playlist_idx).unwrap()])
+                                .next(&self.playlists[(self.current_playlist_idx).unwrap()], self.sink.as_ref().unwrap())
                         }
 
                         if prev_btn.clicked() {
                             self.player
-                                .previous(&self.playlists[(self.current_playlist_idx).unwrap()])
+                                .previous(&self.playlists[(self.current_playlist_idx).unwrap()], self.sink.as_ref().unwrap())
                         }
                     }
                 });
@@ -402,7 +417,7 @@ impl AppState {
                             // as a response
                             if artist_label.double_clicked() {
                                 self.player.selected_track = Some(track.clone());
-                                self.player.play();
+                                self.player.play(self.sink.as_ref().unwrap());
                             }
 
                             if artist_label.clicked() {
@@ -431,29 +446,29 @@ impl AppState {
                     .show_value(false)
                     .clamp_to_range(true),
             );
-            self.player.set_volume(volume);
+            self.player.set_volume(volume,self.sink.as_ref().unwrap());
 
             if let Some(selected_track) = &self.player.selected_track {
                 if stop_btn.clicked() {
-                    self.player.stop();
+                    self.player.stop(self.sink.as_ref().unwrap());
                 }
 
                 if play_btn.clicked() {
-                    self.player.play();
+                    self.player.play(self.sink.as_ref().unwrap());
                 }
 
                 if pause_btn.clicked() {
-                    self.player.pause();
+                    self.player.pause(self.sink.as_ref().unwrap());
                 }
 
                 if prev_btn.clicked() {
                     self.player
-                        .previous(&self.playlists[(self.current_playlist_idx).unwrap()])
+                        .previous(&self.playlists[(self.current_playlist_idx).unwrap()], self.sink.as_ref().unwrap())
                 }
 
                 if next_btn.clicked() {
                     self.player
-                        .next(&self.playlists[(self.current_playlist_idx).unwrap()])
+                        .next(&self.playlists[(self.current_playlist_idx).unwrap()], self.sink.as_ref().unwrap())
                 }
             }
         });
@@ -464,15 +479,24 @@ fn main() {
     tracing_subscriber::fmt::init();
     tracing::info!("App booting...");
 
-    let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+    // TODO - wrap this behavior and add ability so select audio devices
+    let audio_host = rodio::cpal::default_host();
+    let audio_device = audio_host.default_output_device().expect("failed to get default output device");
+
+    tracing::info!("Main - Audio Device Name: {}", &audio_device.name().unwrap_or("failed to obtain device name".to_string()));
+
+    let (_stream, stream_handle) = rodio::OutputStream::try_from_device(&audio_device).unwrap();
     let sink = rodio::Sink::try_new(&stream_handle).unwrap();
 
     let app_state = AppState {
         player: Player::new(sink, stream_handle),
+        //player: Player::new(),
         playlists: Vec::new(),
         current_playlist_idx: None,
         playlist_idx_to_remove: None,
         library: None,
+        sink: None,
+        stream_handle: None,
     };
 
     let mut window_options = eframe::NativeOptions::default();
