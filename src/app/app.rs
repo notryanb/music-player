@@ -8,7 +8,7 @@ use crate::app::LibraryItem;
 
 impl epi::App for App {
     fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
-        if let Some(selected_track) = &self.player.selected_track {
+        if let Some(selected_track) = &self.player.as_mut().unwrap().selected_track {
             let display = format!(
                 "{} - {} [ Music Player ]",
                 &selected_track.artist().unwrap_or("?".to_string()),
@@ -72,26 +72,26 @@ impl epi::App for App {
                     let next_btn = ui.button("Next");
                     let prev_btn = ui.button("Previous");
 
-                    if let Some(selected_track) = &self.player.selected_track {
+                    if let Some(_selected_track) = &self.player.as_mut().unwrap().selected_track {
                         if play_btn.clicked() {
-                            self.player.play();
+                            self.player.as_mut().unwrap().play();
                         }
 
                         if stop_btn.clicked() {
-                            self.player.stop();
+                            self.player.as_mut().unwrap().stop();
                         }
 
                         if pause_btn.clicked() {
-                            self.player.pause();
+                            self.player.as_mut().unwrap().pause();
                         }
 
                         if next_btn.clicked() {
-                            self.player
+                            self.player.as_mut().unwrap()
                                 .next(&self.playlists[(self.current_playlist_idx).unwrap()])
                         }
 
                         if prev_btn.clicked() {
-                            self.player
+                            self.player.as_mut().unwrap()
                                 .previous(&self.playlists[(self.current_playlist_idx).unwrap()])
                         }
                     }
@@ -113,11 +113,11 @@ impl epi::App for App {
 
         egui::TopBottomPanel::bottom("Footer").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                if self.player.is_stopped() {
+                if self.player.as_ref().unwrap().is_stopped() {
                     ui.label("Stopped");
                 } else {
-                    if let Some(selected_track) = &self.player.selected_track {
-                        ui.monospace(egui::RichText::new(self.player.track_state.to_string()));
+                    if let Some(selected_track) = &self.player.as_ref().unwrap().selected_track {
+                        ui.monospace(egui::RichText::new(self.player.as_ref().unwrap().track_state.to_string()));
 
                         ui.label(egui::RichText::new(
                             &selected_track

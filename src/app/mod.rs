@@ -1,25 +1,62 @@
 use library::{Library, LibraryItem};
 use player::Player;
 use playlist::Playlist;
+use serde::{Serialize, Deserialize};
+use serde_json;
+use std::{fs::File, io::Read, io::Write};
 
 use eframe::{egui};
-//use itertools::Itertools;
 
 mod app;
 mod library;
 pub mod player;
 mod playlist;
 
-
+#[derive(Serialize, Deserialize)]
 pub struct App {
-    pub player: Player,
-    pub playlists: Vec<Playlist>,
-    pub current_playlist_idx: Option<usize>,
-    pub playlist_idx_to_remove: Option<usize>,
     pub library: Option<Library>,
+
+    pub playlists: Vec<Playlist>,
+
+    pub current_playlist_idx: Option<usize>,
+    
+    #[serde(skip_serializing, skip_deserializing)]
+    pub player: Option<Player>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub playlist_idx_to_remove: Option<usize>,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            library: None,
+            playlists: vec![],
+            current_playlist_idx: None,
+            player: None,
+            playlist_idx_to_remove: None,
+        }
+    }
 }
 
 impl App {
+    pub fn load() -> Self {
+        let mut saved_state = String::new();
+        let mut file = File::open("./music_player_app.json").unwrap();
+        file.read_to_string(&mut saved_state).unwrap();
+
+        let app = serde_json::from_str(&saved_state).unwrap();
+        app
+    }
+
+    pub fn save(&self) {
+        let config = serde_json::to_string(&self).unwrap();
+        let location = "./music_player_app.json";
+
+        let mut file = File::create(location).unwrap();
+        file.write_all(config.as_bytes()).unwrap();
+    }
+
     fn main_window(&mut self, ctx: &egui::CtxRef) {
         egui::CentralPanel::default().show(ctx, |_ui| {
             egui::TopBottomPanel::top("Playlist Tabs").show(ctx, |ui| {
@@ -64,7 +101,7 @@ impl App {
 
             // Playlist contents
             egui::CentralPanel::default().show(ctx, |ui| {
-                if let Some(current_playlist_idx) = &mut self.current_playlist_idx {
+                if let Some(_current_playlist_idx) = &mut self.current_playlist_idx {
                     self.playlist_table(ui);
                 }
             });
@@ -89,7 +126,7 @@ impl App {
 
                         // Rows
                         for track in self.playlists[*current_playlist_idx].tracks.iter() {
-                            if let Some(selected_track) = &self.player.selected_track {
+                            if let Some(selected_track) = &self.player.as_ref().unwrap().selected_track {
                                 if selected_track == track {
                                     ui.label("▶".to_string());
                                 } else {
@@ -100,7 +137,7 @@ impl App {
                             }
 
                             if let Some(track_number) = &track.track_number() {
-                                ui.label(&track.track_number().unwrap().to_string());
+                                ui.label(&track_number.to_string());
                             } else {
                                 ui.label("");
                             }
@@ -117,12 +154,12 @@ impl App {
                             // Temporary hack because I don't yet know how to treat an entire Row
                             // as a response
                             if artist_label.double_clicked() {
-                                self.player.selected_track = Some(track.clone());
-                                self.player.play();
+                                self.player.as_mut().unwrap().selected_track = Some(track.clone());
+                                self.player.as_mut().unwrap().play();
                             }
 
                             if artist_label.clicked() {
-                                self.player.selected_track = Some(track.clone());
+                                self.player.as_mut().unwrap().selected_track = Some(track.clone());
                             }
 
                             ui.end_row();
@@ -140,35 +177,35 @@ impl App {
             let prev_btn = ui.button("|◀");
             let next_btn = ui.button("▶|");
 
-            let mut volume = self.player.volume;
+            let mut volume = self.player.as_ref().unwrap().volume;
             ui.add(
                 egui::Slider::new(&mut volume, (0.0 as f32)..=(5.0 as f32))
                     .logarithmic(false)
                     .show_value(false)
                     .clamp_to_range(true),
             );
-            self.player.set_volume(volume);
+            self.player.as_mut().unwrap().set_volume(volume);
 
-            if let Some(selected_track) = &self.player.selected_track {
+            if let Some(_selected_track) = &self.player.as_mut().unwrap().selected_track {
                 if stop_btn.clicked() {
-                    self.player.stop();
+                    self.player.as_mut().unwrap().stop();
                 }
 
                 if play_btn.clicked() {
-                    self.player.play();
+                    self.player.as_mut().unwrap().play();
                 }
 
                 if pause_btn.clicked() {
-                    self.player.pause();
+                    self.player.as_mut().unwrap().pause();
                 }
 
                 if prev_btn.clicked() {
-                    self.player
+                    self.player.as_mut().unwrap()
                         .previous(&self.playlists[(self.current_playlist_idx).unwrap()])
                 }
 
                 if next_btn.clicked() {
-                    self.player
+                    self.player.as_mut().unwrap()
                         .next(&self.playlists[(self.current_playlist_idx).unwrap()])
                 }
             }
