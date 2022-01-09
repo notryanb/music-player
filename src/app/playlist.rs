@@ -1,5 +1,5 @@
-use crate::stuff::library::LibraryItem;
-use std::path::PathBuf;
+use crate::app::LibraryItem;
+//use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Playlist {
