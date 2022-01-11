@@ -6,6 +6,7 @@ use crate::app::Library;
 use crate::app::LibraryItem;
 use crate::app::Playlist;
 use id3::Tag;
+use rayon::prelude::*;
 use walkdir::WalkDir;
 
 impl epi::App for App {
@@ -175,40 +176,43 @@ impl epi::App for App {
 
                                 let tx = self.library_sender.as_ref().unwrap().clone();
                                 std::thread::spawn(move || {
-                                    let mut items = vec![];
-
-                                    let files = WalkDir::new(&lib_path)
+                                    let files: Vec<walkdir::DirEntry> = WalkDir::new(&lib_path)
                                         .into_iter()
                                         .filter_map(|e| e.ok())
                                         .skip(1)
-                                        .filter(|entry| entry.file_type().is_file());
+                                        .filter(|entry| entry.file_type().is_file())
+                                        .collect();
 
-                                    for entry in files {
-                                        let tag = Tag::read_from_path(&entry.path());
+                                    let items = files
+                                        .par_iter()
+                                        .map(|entry| {
+                                            let tag = Tag::read_from_path(&entry.path());
 
-                                        let library_item = match tag {
-                                            Ok(tag) => LibraryItem::new(entry.path().to_path_buf())
-                                                .set_title(tag.title())
-                                                .set_artist(tag.artist())
-                                                .set_album(tag.album())
-                                                .set_year(tag.year())
-                                                .set_genre(tag.genre())
-                                                .set_track_number(tag.track()),
-                                            Err(_err) => {
-                                                tracing::warn!(
-                                                    "Couldn't parse to id3: {:?}",
-                                                    &entry.path()
-                                                );
-                                                LibraryItem::new(entry.path().to_path_buf())
-                                            }
-                                        };
+                                            let library_item = match tag {
+                                                Ok(tag) => {
+                                                    LibraryItem::new(entry.path().to_path_buf())
+                                                        .set_title(tag.title())
+                                                        .set_artist(tag.artist())
+                                                        .set_album(tag.album())
+                                                        .set_year(tag.year())
+                                                        .set_genre(tag.genre())
+                                                        .set_track_number(tag.track())
+                                                }
+                                                Err(_err) => {
+                                                    tracing::warn!(
+                                                        "Couldn't parse to id3: {:?}",
+                                                        &entry.path()
+                                                    );
+                                                    LibraryItem::new(entry.path().to_path_buf())
+                                                }
+                                            };
 
-                                        items.push(library_item.clone());
-                                    }
+                                            return library_item;
+                                        })
+                                        .collect::<Vec<LibraryItem>>();
 
                                     tx.send(items).expect("Failed to send")
                                 });
-                                //library.build();
                             }
                         }
 

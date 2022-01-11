@@ -8,6 +8,7 @@ edition = "2021"
 eframe = "0.16"
 id3 = "0.6"
 itertools = "0.10"
+rayon = "1.5"
 rfd = "0.6"
 rodio = "0.14"
 serde = { version = "1", features=["derive"] }

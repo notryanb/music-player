@@ -37,18 +37,26 @@ It is not meant to be used as a serious audio player.
 - [x] Set currently playing track as app Title
 - [x] Display playlist as a table [Playing, Track #, Artist, Album Title, etc... ]
 - [x] Add player indicators next to the track
-- [ ] Selected track is highlighted.
-- [ ] Add toolbar with File, Properties, Help, etc...
-- [ ] Playlist plays to end after track is selected.
+- [x] Improve library build performance and probably offload to a non-ui thread.
+- [x] Add toolbar with File, Properties, Help, etc...
+- [x] Save app state on close (just get it working bare min with a random file).
+- [ ] Use Confy for app state load/save
+- [ ] Figure out error handling (anyhow, eyre, thiserror, etc...)
+- [ ] Refactor into more sensible responsibilities (think components / widgets / features).
 - [ ] Remove tracks from playlist.
 - [ ] Reorder items in playlist.
+- [ ] Support multiple directories for library
+- [ ] Figure out how to use at least one hotkey and key event.
+- [ ] Define key events for the application
+- [ ] Investigate performance regression with a large library.
+- [ ] Selected track is highlighted.
+- [ ] Playlist plays to end after track is selected.
 - [ ] Save playlists.
-- [ ] Save app state on close.
 - [ ] Handle files which can't be decoded correctly into audio. 
 - [ ] Implement library search.
 - [ ] Differentiate between a selected track and the currently playing one.
 - [ ] Library display options [ album, artist, year, genre, folder structure, etc...]
-- [ ] Improve library build performance and probably offload to a non-ui thread.
 - [ ] Library Item hashable?
-- [ ] Refactor into more sensible responsibilities.
+- [ ] Discovery on how to make the library state smaller when saved (compression, better data structure, maybe save separate from app state, etc...)
+- [ ] Surface logs to the user in the UI
 - [ ] Stop with all the cloning... seriously. Everything is cloned.
