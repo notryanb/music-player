@@ -1,60 +1,32 @@
-use id3::Tag;
+//use id3::Tag;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use walkdir::WalkDir;
+//use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Library {
     root_path: PathBuf,
-    items: Option<Vec<LibraryItem>>,
+    items: Vec<LibraryItem>,
 }
 
 impl Library {
     pub fn new(root_path: PathBuf) -> Self {
         Self {
             root_path,
-            items: None,
+            items: Vec::new(),
         }
-    }
-
-    pub fn build(&mut self) {
-        let mut items = vec![];
-
-        let files = WalkDir::new(&self.root_path)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .skip(1)
-            .filter(|entry| entry.file_type().is_file());
-
-        for entry in files {
-            let tag = Tag::read_from_path(&entry.path());
-
-            let library_item = match tag {
-                Ok(tag) => LibraryItem::new(entry.path().to_path_buf())
-                    .set_title(tag.title())
-                    .set_artist(tag.artist())
-                    .set_album(tag.album())
-                    .set_year(tag.year())
-                    .set_genre(tag.genre())
-                    .set_track_number(tag.track()),
-                Err(_err) => {
-                    tracing::warn!("Couldn't parse to id3: {:?}", &entry.path());
-                    LibraryItem::new(entry.path().to_path_buf())
-                }
-            };
-
-            items.push(library_item.clone());
-        }
-
-        self.items = Some(items);
     }
 
     pub fn root_path(&self) -> PathBuf {
         self.root_path.clone()
     }
 
-    pub fn items(&self) -> Option<Vec<LibraryItem>> {
+    pub fn items(&self) -> Vec<LibraryItem> {
         self.items.clone()
+    }
+
+    pub fn add_item(&mut self, library_item: LibraryItem) {
+        self.items.push(library_item);
     }
 }
 

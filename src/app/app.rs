@@ -5,6 +5,8 @@ use super::App;
 use crate::app::Library;
 use crate::app::LibraryItem;
 use crate::app::Playlist;
+use id3::Tag;
+use walkdir::WalkDir;
 
 impl epi::App for App {
     fn on_exit(&mut self) {
@@ -13,6 +15,21 @@ impl epi::App for App {
     }
 
     fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
+        ctx.request_repaint();
+
+        if let Some(rx) = &self.library_receiver {
+            match rx.try_recv() {
+                Ok(library_items) => {
+                    for item in library_items {
+                        if let Some(library) = &mut self.library {
+                            library.add_item(item);
+                        }
+                    }
+                }
+                Err(_) => (),
+            }
+        }
+
         if let Some(selected_track) = &self.player.as_mut().unwrap().selected_track {
             let display = format!(
                 "{} - {} [ Music Player ]",
@@ -154,80 +171,114 @@ impl epi::App for App {
                         if ui.button("Add Library path").clicked() {
                             if let Some(lib_path) = rfd::FileDialog::new().pick_folder() {
                                 tracing::info!("adding library path...");
-                                let mut library = Library::new(lib_path);
-                                library.build();
-                                self.library = Some(library);
+                                self.library = Some(Library::new(lib_path.clone()));
+
+                                let tx = self.library_sender.as_ref().unwrap().clone();
+                                std::thread::spawn(move || {
+                                    let mut items = vec![];
+
+                                    let files = WalkDir::new(&lib_path)
+                                        .into_iter()
+                                        .filter_map(|e| e.ok())
+                                        .skip(1)
+                                        .filter(|entry| entry.file_type().is_file());
+
+                                    for entry in files {
+                                        let tag = Tag::read_from_path(&entry.path());
+
+                                        let library_item = match tag {
+                                            Ok(tag) => LibraryItem::new(entry.path().to_path_buf())
+                                                .set_title(tag.title())
+                                                .set_artist(tag.artist())
+                                                .set_album(tag.album())
+                                                .set_year(tag.year())
+                                                .set_genre(tag.genre())
+                                                .set_track_number(tag.track()),
+                                            Err(_err) => {
+                                                tracing::warn!(
+                                                    "Couldn't parse to id3: {:?}",
+                                                    &entry.path()
+                                                );
+                                                LibraryItem::new(entry.path().to_path_buf())
+                                            }
+                                        };
+
+                                        items.push(library_item.clone());
+                                    }
+
+                                    tx.send(items).expect("Failed to send")
+                                });
+                                //library.build();
                             }
                         }
 
                         if let Some(library) = &self.library {
-                            if let Some(library_items) = &library.items() {
-                                let root_path_string = &library
-                                    .root_path()
-                                    .clone()
-                                    .into_os_string()
-                                    .into_string()
-                                    .unwrap();
+                            let root_path_string = &library
+                                .root_path()
+                                .clone()
+                                .into_os_string()
+                                .into_string()
+                                .unwrap();
 
-                                egui::CollapsingHeader::new(egui::RichText::new(root_path_string))
-                                    .default_open(true)
-                                    .show(ui, |ui| {
-                                        let mut library_items_clone = library_items.clone();
+                            egui::CollapsingHeader::new(egui::RichText::new(root_path_string))
+                                .default_open(true)
+                                .show(ui, |ui| {
+                                    let mut library_items_clone = library.items().clone();
 
-                                        // In order for group by to work from itertools, items must be consecutive, so sort them first.
-                                        library_items_clone.sort_by_key(|item| item.album());
+                                    // In order for group by to work from itertools, items must be consecutive, so sort them first.
+                                    library_items_clone.sort_by_key(|item| item.album());
 
-                                        for (key, group) in
-                                            &library_items_clone.into_iter().group_by(|item| {
-                                                item.album().unwrap_or("?".to_string()).to_string()
-                                            })
-                                        {
-                                            let items = group
-                                                .map(|item| item.clone())
-                                                .collect::<Vec<LibraryItem>>();
+                                    for (key, group) in
+                                        &library_items_clone.into_iter().group_by(|item| {
+                                            item.album().unwrap_or("?".to_string()).to_string()
+                                        })
+                                    {
+                                        let items = group
+                                            .map(|item| item.clone())
+                                            .collect::<Vec<LibraryItem>>();
 
-                                            let library_group = egui::CollapsingHeader::new(
-                                                egui::RichText::new(key),
-                                            )
-                                            .default_open(false)
-                                            .selectable(true)
-                                            .show(ui, |ui| {
-                                                for item in &items {
-                                                    let item_label = ui.add(
-                                                        egui::Label::new(egui::RichText::new(
-                                                            item.title().unwrap_or("?".to_string()),
-                                                        ))
-                                                        .sense(egui::Sense::click()),
-                                                    );
+                                        let library_group =
+                                            egui::CollapsingHeader::new(egui::RichText::new(key))
+                                                .default_open(false)
+                                                .selectable(true)
+                                                .show(ui, |ui| {
+                                                    for item in &items {
+                                                        let item_label = ui.add(
+                                                            egui::Label::new(egui::RichText::new(
+                                                                item.title()
+                                                                    .unwrap_or("?".to_string()),
+                                                            ))
+                                                            .sense(egui::Sense::click()),
+                                                        );
 
-                                                    if item_label.double_clicked() {
-                                                        if let Some(current_playlist_idx) =
-                                                            &self.current_playlist_idx
-                                                        {
-                                                            let current_playlist = &mut self
-                                                                .playlists[*current_playlist_idx];
+                                                        if item_label.double_clicked() {
+                                                            if let Some(current_playlist_idx) =
+                                                                &self.current_playlist_idx
+                                                            {
+                                                                let current_playlist = &mut self
+                                                                    .playlists
+                                                                    [*current_playlist_idx];
 
-                                                            current_playlist.add(item.clone());
+                                                                current_playlist.add(item.clone());
+                                                            }
                                                         }
                                                     }
-                                                }
-                                            });
+                                                });
 
-                                            if let Some(current_playlist_idx) =
-                                                &self.current_playlist_idx
-                                            {
-                                                let current_playlist =
-                                                    &mut self.playlists[*current_playlist_idx];
+                                        if let Some(current_playlist_idx) =
+                                            &self.current_playlist_idx
+                                        {
+                                            let current_playlist =
+                                                &mut self.playlists[*current_playlist_idx];
 
-                                                if library_group.header_response.double_clicked() {
-                                                    for item in items {
-                                                        current_playlist.add(item.clone());
-                                                    }
+                                            if library_group.header_response.double_clicked() {
+                                                for item in items {
+                                                    current_playlist.add(item.clone());
                                                 }
                                             }
                                         }
-                                    });
-                            }
+                                    }
+                                });
                         }
                     });
                 });

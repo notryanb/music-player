@@ -1,5 +1,4 @@
 use crate::app::LibraryItem;
-//use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,6 +53,7 @@ impl Playlist {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn create_playlist() {

@@ -3,6 +3,7 @@ use player::Player;
 use playlist::Playlist;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::{fs::File, io::Read, io::Write};
 
 use eframe::egui;
@@ -25,6 +26,12 @@ pub struct App {
 
     #[serde(skip_serializing, skip_deserializing)]
     pub playlist_idx_to_remove: Option<usize>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub library_sender: Option<Sender<Vec<LibraryItem>>>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub library_receiver: Option<Receiver<Vec<LibraryItem>>>,
 }
 
 impl Default for App {
@@ -35,6 +42,8 @@ impl Default for App {
             current_playlist_idx: None,
             player: None,
             playlist_idx_to_remove: None,
+            library_sender: None,
+            library_receiver: None,
         }
     }
 }
