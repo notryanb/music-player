@@ -1,3 +1,4 @@
+use eframe::epi;
 use library::{Library, LibraryItem};
 use player::Player;
 use playlist::Playlist;
@@ -61,20 +62,15 @@ impl std::fmt::Display for TempError {
 
 impl App {
     pub fn load() -> Result<Self, TempError> {
-        let mut saved_state = String::new();
-        let mut file =
-            File::open("./music_player_app.json").map_err(|_| TempError::MissingAppState)?;
-        file.read_to_string(&mut saved_state)
-            .map_err(|_| TempError::MissingAppState)?;
-        serde_json::from_str(&saved_state).map_err(|_| TempError::MissingAppState)
+        confy::load("music_player", None).map_err(|_| TempError::MissingAppState)
     }
 
     pub fn save_state(&self) {
-        let config = serde_json::to_string(&self).unwrap();
-        let location = "./music_player_app.json";
-
-        let mut file = File::create(location).unwrap();
-        file.write_all(config.as_bytes()).unwrap();
+        let store_result = confy::store("music_player", None, &self);
+        match store_result {
+            Ok(_) => tracing::info!("Store was successfull"),
+            Err(err) => tracing::error!("Failed to store the app state: {}", err),
+        }
     }
 
     fn main_window(&mut self, ctx: &egui::CtxRef) {
