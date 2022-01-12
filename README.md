@@ -40,7 +40,7 @@ It is not meant to be used as a serious audio player.
 - [x] Improve library build performance and probably offload to a non-ui thread.
 - [x] Add toolbar with File, Properties, Help, etc...
 - [x] Save app state on close (just get it working bare min with a random file).
-- [ ] Use Confy for app state load/save
+- [x] Use Confy for app state load/save
 - [ ] Figure out error handling (anyhow, eyre, thiserror, etc...)
 - [ ] Refactor into more sensible responsibilities (think components / widgets / features).
 - [ ] Remove tracks from playlist.
