@@ -2,9 +2,9 @@ use eframe::{egui, epi};
 use itertools::Itertools;
 
 use super::App;
+use crate::app::components::{footer::Footer, menu_bar::MenuBar, AppComponent};
 use crate::app::Library;
 use crate::app::LibraryItem;
-use crate::app::components::{AppComponent, menu_bar::MenuBar};
 
 use id3::Tag;
 use rayon::prelude::*;
@@ -55,29 +55,7 @@ impl epi::App for App {
         });
 
         egui::TopBottomPanel::bottom("Footer").show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                if self.player.as_ref().unwrap().is_stopped() {
-                    ui.label("Stopped");
-                } else {
-                    if let Some(selected_track) = &self.player.as_ref().unwrap().selected_track {
-                        ui.monospace(egui::RichText::new(
-                            self.player.as_ref().unwrap().track_state.to_string(),
-                        ));
-
-                        ui.label(egui::RichText::new(
-                            &selected_track
-                                .path()
-                                .as_path()
-                                .file_name()
-                                .unwrap()
-                                .clone()
-                                .to_os_string()
-                                .into_string()
-                                .unwrap(),
-                        ));
-                    }
-                }
-            });
+            Footer::add(self, ui);
         });
 
         egui::CentralPanel::default().show(ctx, |_ui| {

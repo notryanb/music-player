@@ -1,3 +1,4 @@
+pub mod footer;
 pub mod menu_bar;
 
 pub trait AppComponent {

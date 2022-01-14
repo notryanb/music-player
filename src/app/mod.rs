@@ -7,10 +7,10 @@ use std::sync::mpsc::{Receiver, Sender};
 use eframe::egui;
 
 mod app;
+mod components;
 mod library;
 pub mod player;
 mod playlist;
-mod components;
 
 #[derive(Serialize, Deserialize)]
 pub struct App {

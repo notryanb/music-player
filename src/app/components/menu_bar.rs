@@ -97,5 +97,5 @@ impl AppComponent for MenuBar {
                 let _about_btn = ui.button("About");
             });
         });
-    }    
+    }
 }
