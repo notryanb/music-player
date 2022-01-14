@@ -44,12 +44,12 @@ impl epi::App for App {
         egui::TopBottomPanel::top("MusicPlayer").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    ui.button("Open");
+                    let _open_btn = ui.button("Open");
 
                     ui.separator();
 
-                    ui.button("Add Files");
-                    ui.button("Add Folders");
+                    let _add_files_btn = ui.button("Add Files");
+                    let _add_folders_btn = ui.button("Add Folders");
 
                     ui.separator();
 
@@ -70,12 +70,12 @@ impl epi::App for App {
                         self.playlists.push(new_playlist.clone());
                         self.current_playlist_idx = Some(self.playlists.len() - 1);
                     }
-                    ui.button("Load Playlist");
-                    ui.button("Save Playlist");
+                    let _load_playlist_btn = ui.button("Load Playlist");
+                    let _save_playlist_btn = ui.button("Save Playlist");
 
                     ui.separator();
 
-                    ui.button("Preferences");
+                    let _pref_btn = ui.button("Preferences");
 
                     ui.separator();
 
@@ -85,7 +85,7 @@ impl epi::App for App {
                 });
 
                 ui.menu_button("Edit", |ui| {
-                    ui.button("Remove duplicates");
+                    let _remove_dup_btn = ui.button("Remove duplicates");
                 });
 
                 ui.menu_button("Playback", |ui| {
@@ -125,11 +125,11 @@ impl epi::App for App {
                 });
 
                 ui.menu_button("Library", |ui| {
-                    ui.button("Configure");
+                    let _cgf_btn = ui.button("Configure");
                 });
 
                 ui.menu_button("Help", |ui| {
-                    ui.button("About");
+                    let _about_btn = ui.button("About");
                 });
             });
         });
