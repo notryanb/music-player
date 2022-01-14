@@ -10,6 +10,7 @@ mod app;
 mod library;
 pub mod player;
 mod playlist;
+mod components;
 
 #[derive(Serialize, Deserialize)]
 pub struct App {
@@ -30,6 +31,9 @@ pub struct App {
 
     #[serde(skip_serializing, skip_deserializing)]
     pub library_receiver: Option<Receiver<Vec<LibraryItem>>>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub quit: bool,
 }
 
 impl Default for App {
@@ -42,6 +46,7 @@ impl Default for App {
             playlist_idx_to_remove: None,
             library_sender: None,
             library_receiver: None,
+            quit: false,
         }
     }
 }
@@ -68,6 +73,10 @@ impl App {
             Ok(_) => tracing::info!("Store was successfull"),
             Err(err) => tracing::error!("Failed to store the app state: {}", err),
         }
+    }
+
+    pub fn quit(&mut self) {
+        self.quit = true;
     }
 
     fn main_window(&mut self, ctx: &egui::CtxRef) {

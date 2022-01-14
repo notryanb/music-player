@@ -4,7 +4,8 @@ use itertools::Itertools;
 use super::App;
 use crate::app::Library;
 use crate::app::LibraryItem;
-use crate::app::Playlist;
+use crate::app::components::{AppComponent, menu_bar::MenuBar};
+
 use id3::Tag;
 use rayon::prelude::*;
 use walkdir::WalkDir;
@@ -16,6 +17,10 @@ impl epi::App for App {
     }
 
     fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
+        if self.quit {
+            frame.quit();
+        }
+
         ctx.request_repaint();
 
         if let Some(rx) = &self.library_receiver {
@@ -42,96 +47,7 @@ impl epi::App for App {
         }
 
         egui::TopBottomPanel::top("MusicPlayer").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    let _open_btn = ui.button("Open");
-
-                    ui.separator();
-
-                    let _add_files_btn = ui.button("Add Files");
-                    let _add_folders_btn = ui.button("Add Folders");
-
-                    ui.separator();
-
-                    if ui.button("New Playlist").clicked() {
-                        let default_name_count = self
-                            .playlists
-                            .iter()
-                            .filter(|pl| pl.get_name().unwrap().starts_with("New Playlist"))
-                            .count();
-                        let playlist_name = match default_name_count {
-                            0 => "New Playlist".to_string(),
-                            _ => format!("New Playlist ({})", default_name_count - 1),
-                        };
-
-                        let mut new_playlist = Playlist::new();
-                        new_playlist.set_name(playlist_name);
-
-                        self.playlists.push(new_playlist.clone());
-                        self.current_playlist_idx = Some(self.playlists.len() - 1);
-                    }
-                    let _load_playlist_btn = ui.button("Load Playlist");
-                    let _save_playlist_btn = ui.button("Save Playlist");
-
-                    ui.separator();
-
-                    let _pref_btn = ui.button("Preferences");
-
-                    ui.separator();
-
-                    if ui.button("Exit").clicked() {
-                        frame.quit();
-                    }
-                });
-
-                ui.menu_button("Edit", |ui| {
-                    let _remove_dup_btn = ui.button("Remove duplicates");
-                });
-
-                ui.menu_button("Playback", |ui| {
-                    let play_btn = ui.button("Play");
-                    let stop_btn = ui.button("Stop");
-                    let pause_btn = ui.button("Pause");
-                    let next_btn = ui.button("Next");
-                    let prev_btn = ui.button("Previous");
-
-                    if let Some(_selected_track) = &self.player.as_mut().unwrap().selected_track {
-                        if play_btn.clicked() {
-                            self.player.as_mut().unwrap().play();
-                        }
-
-                        if stop_btn.clicked() {
-                            self.player.as_mut().unwrap().stop();
-                        }
-
-                        if pause_btn.clicked() {
-                            self.player.as_mut().unwrap().pause();
-                        }
-
-                        if next_btn.clicked() {
-                            self.player
-                                .as_mut()
-                                .unwrap()
-                                .next(&self.playlists[(self.current_playlist_idx).unwrap()])
-                        }
-
-                        if prev_btn.clicked() {
-                            self.player
-                                .as_mut()
-                                .unwrap()
-                                .previous(&self.playlists[(self.current_playlist_idx).unwrap()])
-                        }
-                    }
-                });
-
-                ui.menu_button("Library", |ui| {
-                    let _cgf_btn = ui.button("Configure");
-                });
-
-                ui.menu_button("Help", |ui| {
-                    let _about_btn = ui.button("About");
-                });
-            });
+            MenuBar::add(self, ui);
         });
 
         egui::TopBottomPanel::top("Player stuff").show(ctx, |ui| {
