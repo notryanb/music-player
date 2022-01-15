@@ -1,5 +1,6 @@
 pub mod footer;
 pub mod menu_bar;
+pub mod player_component;
 
 pub trait AppComponent {
     type Context;

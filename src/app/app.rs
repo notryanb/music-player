@@ -2,7 +2,7 @@ use eframe::{egui, epi};
 use itertools::Itertools;
 
 use super::App;
-use crate::app::components::{footer::Footer, menu_bar::MenuBar, AppComponent};
+use crate::app::components::{footer::Footer, menu_bar::MenuBar, player_component::PlayerComponent, AppComponent};
 use crate::app::Library;
 use crate::app::LibraryItem;
 
@@ -50,8 +50,9 @@ impl epi::App for App {
             MenuBar::add(self, ui);
         });
 
-        egui::TopBottomPanel::top("Player stuff").show(ctx, |ui| {
-            self.player_ui(ui);
+        egui::TopBottomPanel::top("Player").show(ctx, |ui| {
+            // self.player_ui(ui);
+            PlayerComponent::add(self, ui);
         });
 
         egui::TopBottomPanel::bottom("Footer").show(ctx, |ui| {
