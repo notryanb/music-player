@@ -1,4 +1,5 @@
 pub mod footer;
+pub mod library_component;
 pub mod menu_bar;
 pub mod player_component;
 
