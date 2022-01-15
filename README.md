@@ -41,6 +41,7 @@ It is not meant to be used as a serious audio player.
 - [x] Add toolbar with File, Properties, Help, etc...
 - [x] Save app state on close (just get it working bare min with a random file).
 - [x] Use Confy for app state load/save
+- [ ] Fix library view performance. Don't need to keep computing the grouping every frame - persist it in app state with a new data structure.
 - [ ] Figure out error handling (anyhow, eyre, thiserror, etc...)
 - [ ] Refactor into more sensible responsibilities (think components / widgets / features).
 - [ ] Remove tracks from playlist.
