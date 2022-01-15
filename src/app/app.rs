@@ -3,7 +3,8 @@ use eframe::{egui, epi};
 use super::App;
 use crate::app::components::{
     footer::Footer, library_component::LibraryComponent, menu_bar::MenuBar,
-    player_component::PlayerComponent, AppComponent,
+    player_component::PlayerComponent, playlist_table::PlaylistTable, playlist_tabs::PlaylistTabs,
+    AppComponent,
 };
 
 impl epi::App for App {
@@ -47,7 +48,6 @@ impl epi::App for App {
         });
 
         egui::TopBottomPanel::top("Player").show(ctx, |ui| {
-            // self.player_ui(ui);
             PlayerComponent::add(self, ui);
         });
 
@@ -57,13 +57,26 @@ impl epi::App for App {
 
         egui::CentralPanel::default().show(ctx, |_ui| {
             egui::SidePanel::left("Library Window")
-                .default_width(250.0)
+                .default_width(350.0)
                 .show(ctx, |ui| {
                     LibraryComponent::add(self, ui);
                 });
         });
 
-        self.main_window(ctx);
+        egui::CentralPanel::default().show(ctx, |_ui| {
+            egui::TopBottomPanel::top("Playlist Tabs").show(ctx, |ui| {
+                PlaylistTabs::add(self, ui);
+            });
+
+            // Playlist contents
+            egui::CentralPanel::default().show(ctx, |ui| {
+                if let Some(_current_playlist_idx) = &mut self.current_playlist_idx {
+                    egui::ScrollArea::both().show(ui, |ui| {
+                        PlaylistTable::add(self, ui);
+                    });
+                }
+            });
+        });
     }
 
     fn name(&self) -> &str {
