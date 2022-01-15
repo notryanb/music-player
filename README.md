@@ -41,15 +41,15 @@ It is not meant to be used as a serious audio player.
 - [x] Add toolbar with File, Properties, Help, etc...
 - [x] Save app state on close (just get it working bare min with a random file).
 - [x] Use Confy for app state load/save
+- [x] Refactor into more sensible responsibilities (think components / widgets / features).
+- [x] Investigate performance regression with a large library (this is due to sorting/grouping the view on every frame)
 - [ ] Fix library view performance. Don't need to keep computing the grouping every frame - persist it in app state with a new data structure.
 - [ ] Figure out error handling (anyhow, eyre, thiserror, etc...)
-- [ ] Refactor into more sensible responsibilities (think components / widgets / features).
 - [ ] Remove tracks from playlist.
 - [ ] Reorder items in playlist.
 - [ ] Support multiple directories for library
 - [ ] Figure out how to use at least one hotkey and key event.
 - [ ] Define key events for the application
-- [ ] Investigate performance regression with a large library.
 - [ ] Selected track is highlighted.
 - [ ] Playlist plays to end after track is selected.
 - [ ] Save playlists.
