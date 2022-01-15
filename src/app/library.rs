@@ -5,6 +5,7 @@ use std::path::PathBuf;
 pub struct Library {
     root_path: PathBuf,
     items: Vec<LibraryItem>,
+    library_view: LibraryView,
 }
 
 impl Library {
@@ -12,6 +13,10 @@ impl Library {
         Self {
             root_path,
             items: Vec::new(),
+            library_view: LibraryView {
+                view_type: ViewType::Album,
+                containers: Vec::new(),
+            },
         }
     }
 
@@ -23,8 +28,16 @@ impl Library {
         self.items.clone()
     }
 
+    pub fn view(&self) -> LibraryView {
+        self.library_view.clone()
+    }
+
     pub fn add_item(&mut self, library_item: LibraryItem) {
         self.items.push(library_item);
+    }
+
+    pub fn add_view(&mut self, library_view: LibraryView) {
+        self.library_view = library_view;
     }
 }
 
@@ -118,4 +131,23 @@ impl LibraryItem {
     pub fn track_number(&self) -> Option<u32> {
         self.track_number.clone()
     }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LibraryView {
+    pub view_type: ViewType,
+    pub containers: Vec<LibraryItemContainer>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LibraryItemContainer {
+    pub name: String,
+    pub items: Vec<LibraryItem>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum ViewType {
+    Album,
+    Artist,
+    Genre,
 }

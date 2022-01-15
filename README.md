@@ -43,7 +43,7 @@ It is not meant to be used as a serious audio player.
 - [x] Use Confy for app state load/save
 - [x] Refactor into more sensible responsibilities (think components / widgets / features).
 - [x] Investigate performance regression with a large library (this is due to sorting/grouping the view on every frame)
-- [ ] Fix library view performance. Don't need to keep computing the grouping every frame - persist it in app state with a new data structure.
+- [x] Fix library view performance. Don't need to keep computing the grouping every frame - persist it in app state with a new data structure.
 - [ ] Figure out error handling (anyhow, eyre, thiserror, etc...)
 - [ ] Remove tracks from playlist.
 - [ ] Reorder items in playlist.

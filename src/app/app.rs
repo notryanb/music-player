@@ -18,16 +18,10 @@ impl epi::App for App {
             frame.quit();
         }
 
-        ctx.request_repaint();
-
         if let Some(rx) = &self.library_receiver {
             match rx.try_recv() {
-                Ok(library_items) => {
-                    for item in library_items {
-                        if let Some(library) = &mut self.library {
-                            library.add_item(item);
-                        }
-                    }
+                Ok(library) => {
+                    self.library = Some(library);
                 }
                 Err(_) => (),
             }
@@ -68,7 +62,6 @@ impl epi::App for App {
                 PlaylistTabs::add(self, ui);
             });
 
-            // Playlist contents
             egui::CentralPanel::default().show(ctx, |ui| {
                 if let Some(_current_playlist_idx) = &mut self.current_playlist_idx {
                     egui::ScrollArea::both().show(ui, |ui| {

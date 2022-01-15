@@ -1,4 +1,4 @@
-use library::{Library, LibraryItem};
+use library::{Library, LibraryItem, LibraryView};
 use player::Player;
 use playlist::Playlist;
 use serde::{Deserialize, Serialize};
@@ -25,10 +25,10 @@ pub struct App {
     pub playlist_idx_to_remove: Option<usize>,
 
     #[serde(skip_serializing, skip_deserializing)]
-    pub library_sender: Option<Sender<Vec<LibraryItem>>>,
+    pub library_sender: Option<Sender<Library>>,
 
     #[serde(skip_serializing, skip_deserializing)]
-    pub library_receiver: Option<Receiver<Vec<LibraryItem>>>,
+    pub library_receiver: Option<Receiver<Library>>,
 
     #[serde(skip_serializing, skip_deserializing)]
     pub quit: bool,

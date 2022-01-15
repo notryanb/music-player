@@ -1,5 +1,6 @@
 use super::AppComponent;
-use crate::app::{App, Library, LibraryItem};
+use crate::app::library::{LibraryItemContainer, ViewType};
+use crate::app::{App, Library, LibraryItem, LibraryView};
 use itertools::Itertools;
 
 use id3::Tag;
@@ -12,12 +13,14 @@ impl AppComponent for LibraryComponent {
 
     fn add(ctx: &mut Self::Context, ui: &mut eframe::egui::Ui) {
         eframe::egui::ScrollArea::both().show(ui, |ui| {
+            // TODO - Store library paths and only import if the library path doesn't already exist
             if ui.button("Add Library path").clicked() {
                 if let Some(lib_path) = rfd::FileDialog::new().pick_folder() {
                     tracing::info!("adding library path...");
-                    ctx.library = Some(Library::new(lib_path.clone()));
 
+                    let mut new_library = Library::new(lib_path.clone());
                     let tx = ctx.library_sender.as_ref().unwrap().clone();
+
                     std::thread::spawn(move || {
                         let files: Vec<walkdir::DirEntry> = walkdir::WalkDir::new(&lib_path)
                             .into_iter()
@@ -52,7 +55,40 @@ impl AppComponent for LibraryComponent {
                             })
                             .collect::<Vec<LibraryItem>>();
 
-                        tx.send(items).expect("Failed to send")
+                        tracing::info!("Done parsing library items");
+
+                        // Populate the library
+                        for item in &items {
+                            new_library.add_item(item.clone());
+                        }
+
+                        // Build the views
+                        let mut library_view = LibraryView {
+                            view_type: ViewType::Album,
+                            containers: Vec::new(),
+                        };
+
+                        // In order for group by to work from itertools, items must be consecutive, so sort them first.
+                        let mut library_items_clone = items.clone();
+                        library_items_clone.sort_by_key(|item| item.album());
+
+                        let grouped_library_by_album = &library_items_clone
+                            .into_iter()
+                            .group_by(|item| item.album().unwrap_or("?".to_string()).to_string());
+
+                        for (album_name, album_library_items) in grouped_library_by_album {
+                            let lib_item_container = LibraryItemContainer {
+                                name: album_name.clone(),
+                                items: album_library_items
+                                    .map(|item| item.clone())
+                                    .collect::<Vec<LibraryItem>>(),
+                            };
+
+                            library_view.containers.push(lib_item_container.clone());
+                        }
+
+                        new_library.add_view(library_view);
+                        tx.send(new_library).expect("Failed to send")
                     });
                 }
             }
@@ -68,25 +104,18 @@ impl AppComponent for LibraryComponent {
                 eframe::egui::CollapsingHeader::new(eframe::egui::RichText::new(root_path_string))
                     .default_open(true)
                     .show(ui, |ui| {
-                        let mut library_items_clone = library.items().clone();
+                        let library_view = &library.view();
 
-                        // In order for group by to work from itertools, items must be consecutive, so sort them first.
-                        library_items_clone.sort_by_key(|item| item.album());
-
-                        for (key, group) in &library_items_clone
-                            .into_iter()
-                            .group_by(|item| item.album().unwrap_or("?".to_string()).to_string())
-                        {
-                            let items =
-                                group.map(|item| item.clone()).collect::<Vec<LibraryItem>>();
+                        for container in &library_view.containers {
+                            let items = &container.items;
 
                             let library_group = eframe::egui::CollapsingHeader::new(
-                                eframe::egui::RichText::new(key),
+                                eframe::egui::RichText::new(&container.name),
                             )
                             .default_open(false)
                             .selectable(true)
                             .show(ui, |ui| {
-                                for item in &items {
+                                for item in &container.items {
                                     let item_label = ui.add(
                                         eframe::egui::Label::new(eframe::egui::RichText::new(
                                             item.title().unwrap_or("?".to_string()),
