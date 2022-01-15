@@ -2,7 +2,7 @@ pub use crate::app::player::Player;
 pub use crate::app::App;
 
 use eframe::egui;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::channel;
 
 mod app;
 
