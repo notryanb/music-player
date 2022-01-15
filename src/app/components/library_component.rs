@@ -32,15 +32,13 @@ impl AppComponent for LibraryComponent {
                                 let tag = Tag::read_from_path(&entry.path());
 
                                 let library_item = match tag {
-                                    Ok(tag) => {
-                                        LibraryItem::new(entry.path().to_path_buf())
-                                            .set_title(tag.title())
-                                            .set_artist(tag.artist())
-                                            .set_album(tag.album())
-                                            .set_year(tag.year())
-                                            .set_genre(tag.genre())
-                                            .set_track_number(tag.track())
-                                    }
+                                    Ok(tag) => LibraryItem::new(entry.path().to_path_buf())
+                                        .set_title(tag.title())
+                                        .set_artist(tag.artist())
+                                        .set_album(tag.album())
+                                        .set_year(tag.year())
+                                        .set_genre(tag.genre())
+                                        .set_track_number(tag.track()),
                                     Err(_err) => {
                                         tracing::warn!(
                                             "Couldn't parse to id3: {:?}",
@@ -75,48 +73,42 @@ impl AppComponent for LibraryComponent {
                         // In order for group by to work from itertools, items must be consecutive, so sort them first.
                         library_items_clone.sort_by_key(|item| item.album());
 
-                        for (key, group) in
-                            &library_items_clone.into_iter().group_by(|item| {
-                                item.album().unwrap_or("?".to_string()).to_string()
-                            })
+                        for (key, group) in &library_items_clone
+                            .into_iter()
+                            .group_by(|item| item.album().unwrap_or("?".to_string()).to_string())
                         {
-                            let items = group
-                                .map(|item| item.clone())
-                                .collect::<Vec<LibraryItem>>();
+                            let items =
+                                group.map(|item| item.clone()).collect::<Vec<LibraryItem>>();
 
-                            let library_group =
-                                eframe::egui::CollapsingHeader::new(eframe::egui::RichText::new(key))
-                                    .default_open(false)
-                                    .selectable(true)
-                                    .show(ui, |ui| {
-                                        for item in &items {
-                                            let item_label = ui.add(
-                                                eframe::egui::Label::new(eframe::egui::RichText::new(
-                                                    item.title()
-                                                        .unwrap_or("?".to_string()),
-                                                ))
-                                                .sense(eframe::egui::Sense::click()),
-                                            );
+                            let library_group = eframe::egui::CollapsingHeader::new(
+                                eframe::egui::RichText::new(key),
+                            )
+                            .default_open(false)
+                            .selectable(true)
+                            .show(ui, |ui| {
+                                for item in &items {
+                                    let item_label = ui.add(
+                                        eframe::egui::Label::new(eframe::egui::RichText::new(
+                                            item.title().unwrap_or("?".to_string()),
+                                        ))
+                                        .sense(eframe::egui::Sense::click()),
+                                    );
 
-                                            if item_label.double_clicked() {
-                                                if let Some(current_playlist_idx) =
-                                                    &ctx.current_playlist_idx
-                                                {
-                                                    let current_playlist = &mut ctx
-                                                        .playlists
-                                                        [*current_playlist_idx];
+                                    if item_label.double_clicked() {
+                                        if let Some(current_playlist_idx) =
+                                            &ctx.current_playlist_idx
+                                        {
+                                            let current_playlist =
+                                                &mut ctx.playlists[*current_playlist_idx];
 
-                                                    current_playlist.add(item.clone());
-                                                }
-                                            }
+                                            current_playlist.add(item.clone());
                                         }
-                                    });
+                                    }
+                                }
+                            });
 
-                            if let Some(current_playlist_idx) =
-                                &ctx.current_playlist_idx
-                            {
-                                let current_playlist =
-                                    &mut ctx.playlists[*current_playlist_idx];
+                            if let Some(current_playlist_idx) = &ctx.current_playlist_idx {
+                                let current_playlist = &mut ctx.playlists[*current_playlist_idx];
 
                                 if library_group.header_response.double_clicked() {
                                     for item in items {
