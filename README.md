@@ -44,6 +44,8 @@ It is not meant to be used as a serious audio player.
 - [x] Refactor into more sensible responsibilities (think components / widgets / features).
 - [x] Investigate performance regression with a large library (this is due to sorting/grouping the view on every frame)
 - [x] Fix library view performance. Don't need to keep computing the grouping every frame - persist it in app state with a new data structure.
+- [ ] Fix all egui deprecation errors... should be just one for using `CollapsingState` instead of `CollapsingHeader`
+- [ ] Fix Dark mode now that egui has made some changes in 0.18
 - [ ] Figure out error handling (anyhow, eyre, thiserror, etc...)
 - [ ] Remove tracks from playlist.
 - [ ] Reorder items in playlist.

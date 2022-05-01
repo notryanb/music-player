@@ -1,4 +1,4 @@
-use eframe::{egui, epi};
+use eframe::egui;
 
 use super::App;
 use crate::app::components::{
@@ -7,13 +7,13 @@ use crate::app::components::{
     AppComponent,
 };
 
-impl epi::App for App {
-    fn on_exit(&mut self) {
+impl eframe::App for App {
+    fn on_exit(&mut self, _ctx: &eframe::glow::Context) {
         tracing::info!("exiting and saving");
         self.save_state();
     }
 
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         if self.quit {
             frame.quit();
         }
@@ -70,9 +70,5 @@ impl epi::App for App {
                 }
             });
         });
-    }
-
-    fn name(&self) -> &str {
-        "Music Player"
     }
 }
