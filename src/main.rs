@@ -22,5 +22,5 @@ fn main() {
 
     let mut window_options = eframe::NativeOptions::default();
     window_options.initial_window_size = Some(egui::Vec2::new(1024., 768.));
-    eframe::run_native(Box::new(app), window_options);
+    eframe::run_native("Music Player", window_options, Box::new(|_| Box::new(app)));
 }
