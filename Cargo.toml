@@ -5,7 +5,7 @@ authors = ["Ryan Blecher <notryanb@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-eframe = "0.18"
+eframe = "0.21.3"
 id3 = "0.6"
 itertools = "0.10"
 rayon = "1.5"
