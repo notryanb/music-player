@@ -8,14 +8,14 @@ use crate::app::components::{
 };
 
 impl eframe::App for App {
-    fn on_exit(&mut self, _ctx: &eframe::glow::Context) {
+    fn on_exit(&mut self, _ctx: Option<&eframe::glow::Context>) {
         tracing::info!("exiting and saving");
         self.save_state();
     }
 
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         if self.quit {
-            frame.quit();
+            frame.close();
         }
 
         if let Some(rx) = &self.library_receiver {
