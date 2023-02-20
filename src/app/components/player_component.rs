@@ -29,6 +29,8 @@ impl AppComponent for PlayerComponent {
                 }
 
                 if play_btn.clicked() {
+                    let tx = ctx.audio_sender.as_ref().unwrap().clone();
+                    tx.send("Hi from player sender".to_string()).expect("Failed to send to audio thread");
                     ctx.player.as_mut().unwrap().play();
                 }
 

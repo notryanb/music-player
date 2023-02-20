@@ -23,7 +23,10 @@ pub struct App {
 
     #[serde(skip_serializing, skip_deserializing)]
     pub playlist_idx_to_remove: Option<usize>,
-
+    
+    #[serde(skip_serializing, skip_deserializing)]
+    pub audio_sender: Option<Sender<String>>,
+    
     #[serde(skip_serializing, skip_deserializing)]
     pub library_sender: Option<Sender<Library>>,
 
@@ -42,6 +45,7 @@ impl Default for App {
             current_playlist_idx: None,
             player: None,
             playlist_idx_to_remove: None,
+            audio_sender: None,
             library_sender: None,
             library_receiver: None,
             quit: false,
