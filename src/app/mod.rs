@@ -10,6 +10,14 @@ mod library;
 pub mod player;
 mod playlist;
 
+pub enum AudioCommand {
+    Stop,
+    Play,
+    Pause,
+    Scrub(f32),
+    LoadFile(std::path::PathBuf),
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct App {
     pub library: Option<Library>,
@@ -25,7 +33,7 @@ pub struct App {
     pub playlist_idx_to_remove: Option<usize>,
     
     #[serde(skip_serializing, skip_deserializing)]
-    pub audio_sender: Option<Sender<String>>,
+    pub audio_sender: Option<Sender<AudioCommand>>,
     
     #[serde(skip_serializing, skip_deserializing)]
     pub library_sender: Option<Sender<Library>>,
