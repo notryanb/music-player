@@ -31,10 +31,10 @@ pub struct App {
 
     #[serde(skip_serializing, skip_deserializing)]
     pub playlist_idx_to_remove: Option<usize>,
-    
+
     #[serde(skip_serializing, skip_deserializing)]
     pub audio_sender: Option<Sender<AudioCommand>>,
-    
+
     #[serde(skip_serializing, skip_deserializing)]
     pub library_sender: Option<Sender<Library>>,
 

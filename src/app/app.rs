@@ -1,13 +1,11 @@
 use eframe::egui;
 
-
 use super::App;
 use crate::app::components::{
     footer::Footer, library_component::LibraryComponent, menu_bar::MenuBar,
     player_component::PlayerComponent, playlist_table::PlaylistTable, playlist_tabs::PlaylistTabs,
     AppComponent,
 };
-
 
 impl eframe::App for App {
     fn on_exit(&mut self, _ctx: Option<&eframe::glow::Context>) {

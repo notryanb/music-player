@@ -30,20 +30,23 @@ impl AppComponent for PlayerComponent {
                 if stop_btn.clicked() {
                     println!("about to send stop message...");
                     let tx = ctx.audio_sender.as_ref().unwrap().clone();
-                    tx.send(AudioCommand::Stop).expect("Failed to send stop to audio thread");
+                    tx.send(AudioCommand::Stop)
+                        .expect("Failed to send stop to audio thread");
                 }
 
                 if play_btn.clicked() {
                     println!("about to send play message...");
                     let tx = ctx.audio_sender.as_ref().unwrap().clone();
                     let track_path = selected_track.path().clone();
-                    tx.send(AudioCommand::LoadFile(track_path)).expect("Failed to send to audio thread");
+                    tx.send(AudioCommand::LoadFile(track_path))
+                        .expect("Failed to send to audio thread");
                 }
-                
+
                 if pause_btn.clicked() {
                     println!("about to send pause message...");
                     let tx = ctx.audio_sender.as_ref().unwrap().clone();
-                    tx.send(AudioCommand::Pause).expect("Failed to send pause to audio thread");
+                    tx.send(AudioCommand::Pause)
+                        .expect("Failed to send pause to audio thread");
                 }
             }
 
