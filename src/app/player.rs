@@ -7,6 +7,7 @@ pub struct Player {
     pub sink: rodio::Sink,
     pub stream_handle: rodio::OutputStreamHandle,
     pub volume: f32,
+    pub seek_in_seconds: u32,
 }
 
 impl Player {
@@ -17,6 +18,7 @@ impl Player {
             sink: sink,
             stream_handle: stream_handle,
             volume: 1.0,
+            seek_in_seconds: 0, // TODO: This should have subsecond precision, but is okay for now.
         }
     }
 
@@ -108,6 +110,10 @@ impl Player {
     pub fn set_volume(&mut self, volume: f32) {
         self.volume = volume;
         self.sink.set_volume(volume);
+    }
+    
+    pub fn set_seek_in_seconds(&mut self, seek_in_seconds: u32) {
+        self.seek_in_seconds = seek_in_seconds;
     }
 }
 

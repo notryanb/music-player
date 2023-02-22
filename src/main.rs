@@ -159,6 +159,9 @@ fn main() {
 
         let mut audio_cursor: usize = 0;
         let cursor = Arc::new(AtomicU32::new(0));
+        let mut current_track_sample_count = 0;
+        let mut current_track_sample_rate = 0;
+        current_track_sample_rate = desired_sample_rate;
 
         //let mut all_mp3_samples: Vec<i16> = Vec::new();
 
@@ -171,6 +174,10 @@ fn main() {
             match result {
                 Ok(cmd) => {
                     match cmd {
+                        AudioCommand::ScrubToSeconds(seconds) => {
+                            let sample_num = current_track_sample_rate * seconds as u32;
+                            cursor.swap(sample_num, Relaxed);
+                        }
                         AudioCommand::Stop => {
                             println!("STOP command");
                             {
@@ -248,8 +255,12 @@ fn main() {
                                 .collect::<Vec<i16>>();
                                 //.into_iter();
 
+                            // I think it makes sense to assert that the buffer len is evenly
+                            // divisible by the audio channel count before going forward.
+                            // Right now I could care less...
                             let sample_count_resampled = *(&flat_channels.len()) as f32 / 2.0f32;
-                            let track_length_in_seconds_resampled = sample_count_resampled / desired_sample_rate as f32;
+                            current_track_sample_count = sample_count_resampled as u32;
+                            let track_length_in_seconds_resampled = (sample_count_resampled as f32 / desired_sample_rate as f32) as i32;
                             println!("resampled: sample_rate: {desired_sample_rate}, sample_count: {sample_count_resampled}, track_length_in_seconds: {track_length_in_seconds_resampled}");
 
                             // Setup playing

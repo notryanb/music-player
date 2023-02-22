@@ -14,7 +14,7 @@ pub enum AudioCommand {
     Stop,
     Play,
     Pause,
-    Scrub(f32),
+    ScrubToSeconds(u32),
     LoadFile(std::path::PathBuf),
 }
 
