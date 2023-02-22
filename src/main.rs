@@ -13,6 +13,7 @@ use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
+use rubato::{Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction};
 
 mod app;
 
@@ -149,6 +150,9 @@ fn main() {
         let config: cpal::StreamConfig = supported_config.into();
         let config_sample_rate = config.sample_rate.0 as f32;
         let desired_sample_rate = 44_100;
+        println!("config sample rate: {config_sample_rate}");
+
+            
 
         // it looks like anything i want to modify between the cpal thread and here needs
         // to go into a threadsafe struct
@@ -186,13 +190,69 @@ fn main() {
                             );
                             let mp3_decoder = Mp3Decoder::new(buf)
                                 .expect("Failed to create mp3 decoder from file buffer");
-                            //all_mp3_samples = mp3_decoder.map(|s| s as i16).collect::<Vec<i16>>();
-                            let all_mp3_samples =
-                                mp3_decoder.map(|s| s as i16).collect::<Vec<i16>>();
+                            let mut all_mp3_samples_f64 = mp3_decoder.map(|s| s as f64).collect::<Vec<f64>>();
+                            /*
+                            let all_mp3_samples = mp3_decoder.map(|s| s as i16).collect::<Vec<i16>>();
                             let sample_count = all_mp3_samples.len() as f32 / 2.0f32;
                             let track_length_in_seconds = sample_count / desired_sample_rate as f32;
+                            */
                             //let mut samples_iter = all_mp3_samples.into_iter();
 
+                            // Resample Audio
+                            let mut left = vec![];
+                            let mut right = vec![];
+                            for (idx, sample) in all_mp3_samples_f64.iter().enumerate() {
+                                if idx % 2 == 0 {
+                                    left.push(*sample);
+                                } else {
+                                    right.push(*sample);
+                                }
+                            }
+
+                            assert!(left.len() == right.len());
+                            println!("About to resample");
+                            let params = InterpolationParameters {
+                                sinc_len: 256,
+                                f_cutoff: 0.95,
+                                interpolation: InterpolationType::Linear,
+                                oversampling_factor: 256,
+                                window: WindowFunction::BlackmanHarris2,
+                            };
+
+                            let mut resampler = SincFixedIn::<f64>::new(
+                                48_000 as f64 / desired_sample_rate as f64, // should be using config_sample_rate / the mp3's sample_rate
+                                2.0,
+                                params,
+                                left.len(),
+                                2
+                            ).unwrap();
+
+                            let channels = vec![left, right];
+                            let resampled_audio = resampler.process(&channels, None).expect("failed to resample audio");
+                            println!("Finished resampling");
+
+                            let zip_audio = resampled_audio[0]
+                                .iter()
+                                .zip(&resampled_audio[1])
+                                .collect::<Vec<(&f64, &f64)>>();
+
+                            let mut vec_channels = vec![];
+                            for z in zip_audio {
+                                vec_channels.push(vec![*z.0, *z.1]);
+                            }
+
+                            let mut flat_channels = vec_channels
+                                .iter()
+                                .flatten()
+                                .map(|s| *s as i16)
+                                .collect::<Vec<i16>>();
+                                //.into_iter();
+
+                            let sample_count_resampled = *(&flat_channels.len()) as f32 / 2.0f32;
+                            let track_length_in_seconds_resampled = sample_count_resampled / desired_sample_rate as f32;
+                            println!("resampled: sample_rate: {desired_sample_rate}, sample_count: {sample_count_resampled}, track_length_in_seconds: {track_length_in_seconds_resampled}");
+
+                            // Setup playing
                             let c1 = cursor.clone();
                             let s1 = state.clone();
                             let mut next_sample = move || {
@@ -206,9 +266,10 @@ fn main() {
                                     PlayerState::Stopped => 0i16,
                                     PlayerState::Playing => {
                                         let c = c1.fetch_add(1, Relaxed);
-                                        let sample = &all_mp3_samples[c as usize];
+                                        //let sample = &all_mp3_samples[c as usize];
+                                        let sample = flat_channels[c as usize];
                                         //audio_cursor += 1;
-                                        *sample
+                                        sample
                                         /*
                                         //let a = all_mp3_samples.clone();
                                         match samples_iter.next() {
@@ -220,10 +281,12 @@ fn main() {
                                 }
                             };
 
+                            /*
                             println!(
                                 "sample_rate: {}, sample_count: {}, track_length_in_seconds: {}",
                                 &config_sample_rate, &sample_count, &track_length_in_seconds
                             );
+                            */
 
                             // The actual playing should be done by the player command, but this is
                             // a test.
