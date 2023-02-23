@@ -26,59 +26,30 @@ impl AppComponent for PlayerComponent {
 
             // Time Slider
             let mut seek_in_seconds = ctx.player.as_ref().unwrap().seek_in_seconds;
-            let time_slider = eframe::egui::Slider::new(&mut seek_in_seconds, 0..=(3 * 60))
+            let time_slider = ui.add(
+                eframe::egui::Slider::new(&mut seek_in_seconds, 0..=(3 * 60))
                     .logarithmic(false)
                     .show_value(true)
-                    .clamp_to_range(true);
-            let time_slider_widget = ui.add(time_slider);
-            ctx.player.as_mut().unwrap().set_seek_in_seconds(seek_in_seconds);
+                    .clamp_to_range(true),
+            );
+            ctx.player
+                .as_mut()
+                .unwrap()
+                .set_seek_in_seconds(seek_in_seconds);
 
-            if time_slider_widget.drag_released() {
-                println!("about to send scrub message...");
-                let tx = ctx.audio_sender.as_ref().unwrap().clone();
-                tx.send(AudioCommand::ScrubToSeconds(seek_in_seconds))
-                    .expect("Failed to send stop to audio thread");
-            }
-            
-            // if time slider was selected and then lost focus
-            // Send ScrubToSeconds(seconds) value to ctx.audio_sender
-
-            // DEMO: Making sure clicking the play button actually sends a message to the audio
-            // thread.
-            if let Some(selected_track) = &ctx.player.as_ref().unwrap().selected_track {
-                if stop_btn.clicked() {
-                    println!("about to send stop message...");
-                    let tx = ctx.audio_sender.as_ref().unwrap().clone();
-                    tx.send(AudioCommand::Stop)
-                        .expect("Failed to send stop to audio thread");
-                }
-
-                if play_btn.clicked() {
-                    println!("about to send play message...");
-                    let tx = ctx.audio_sender.as_ref().unwrap().clone();
-                    let track_path = selected_track.path().clone();
-                    tx.send(AudioCommand::LoadFile(track_path))
-                        .expect("Failed to send to audio thread");
-                }
-
-                if pause_btn.clicked() {
-                    println!("about to send pause message...");
-                    let tx = ctx.audio_sender.as_ref().unwrap().clone();
-                    tx.send(AudioCommand::Pause)
-                        .expect("Failed to send pause to audio thread");
-                }
+            if time_slider.drag_released() {
+                ctx.player.as_mut().unwrap().seek_to(seek_in_seconds);
             }
 
-            /*
             if let Some(_selected_track) = &ctx.player.as_mut().unwrap().selected_track {
                 if stop_btn.clicked() {
                     ctx.player.as_mut().unwrap().stop();
                 }
 
                 if play_btn.clicked() {
-                    let tx = ctx.audio_sender.as_ref().unwrap().clone();
-                    let track_path = _selected_track.path().clone();
-                    tx.send(AudioCommand::LoadFile(track_path)).expect("Failed to send to audio thread");
+                    //let tx = ctx.audio_sender.as_ref().unwrap().clone();
+                    //let track_path = _selected_track.path().clone();
+                    //tx.send(AudioCommand::LoadFile(track_path)).expect("Failed to send to audio thread");
                     ctx.player.as_mut().unwrap().play();
                 }
 
@@ -100,7 +71,6 @@ impl AppComponent for PlayerComponent {
                         .next(&ctx.playlists[(ctx.current_playlist_idx).unwrap()])
                 }
             }
-            */
         });
     }
 }

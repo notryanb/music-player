@@ -6,6 +6,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Sample, SampleFormat};
 use eframe::egui;
 use minimp3::{Decoder, Frame};
+use rubato::{InterpolationParameters, InterpolationType, Resampler, SincFixedIn, WindowFunction};
 use std::fs::File;
 use std::io::{Read, Seek};
 use std::sync::atomic::{AtomicU32, Ordering::*};
@@ -13,17 +14,8 @@ use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
-use rubato::{Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction};
 
 mod app;
-
-// TODO:
-// Spawn a dedicated audio thread which will hold onto a receiver.
-// the audio thread should have an audio buffer
-// The receiver should be listening for commands
-// Commands can be load audio, scrub, flush buffer, etc..
-// the audio thread will need to process the command and fill the audio buffer
-//
 
 pub struct Mp3Decoder<R>
 where
@@ -52,6 +44,10 @@ where
     }
 }
 
+// TODO
+// Instead of decoding the entire buffer up front and then resampling the entire thing,
+// I can decode the next frame of data, resample the frame only. One issue here is I'll be missing
+// out on being able to figure out track length by frames.
 impl<R> Iterator for Mp3Decoder<R>
 where
     R: Read + Seek,
@@ -115,15 +111,13 @@ fn main() {
 
     let (tx, rx) = channel();
     let (audio_tx, audio_rx) = channel();
-    let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
-    let sink = rodio::Sink::try_new(&stream_handle).unwrap();
-    let player = Player::new(sink, stream_handle);
+    let player = Player::new(audio_tx);
 
     let mut app = App::load().unwrap_or_default();
     app.player = Some(player);
     app.library_sender = Some(tx);
     app.library_receiver = Some(rx);
-    app.audio_sender = Some(audio_tx);
+    //app.audio_sender = Some(audio_tx);
 
     let audio_thread = thread::spawn(move || {
         // This is basically going to be an audio engine completely decoupled from the GUI app and
@@ -152,12 +146,10 @@ fn main() {
         let desired_sample_rate = 44_100;
         println!("config sample rate: {config_sample_rate}");
 
-            
-
         // it looks like anything i want to modify between the cpal thread and here needs
         // to go into a threadsafe struct
 
-        let mut audio_cursor: usize = 0;
+        let audio_cursor: usize = 0;
         let cursor = Arc::new(AtomicU32::new(0));
         let mut current_track_sample_count = 0;
         let mut current_track_sample_rate = 0;
@@ -166,7 +158,7 @@ fn main() {
         //let mut all_mp3_samples: Vec<i16> = Vec::new();
 
         let mut audio_output_stream = None;
-        let mut state = Arc::new(Mutex::new(PlayerState::Stopped));
+        let state = Arc::new(Mutex::new(PlayerState::Stopped));
 
         // Audio processing loop
         loop {
@@ -174,12 +166,12 @@ fn main() {
             match result {
                 Ok(cmd) => {
                     match cmd {
-                        AudioCommand::ScrubToSeconds(seconds) => {
+                        AudioCommand::Seek(seconds) => {
                             let sample_num = current_track_sample_rate * seconds as u32;
                             cursor.swap(sample_num, Relaxed);
                         }
                         AudioCommand::Stop => {
-                            println!("STOP command");
+                            tracing::info!("Processing STOP command");
                             {
                                 let mut state_guard = state.lock().unwrap();
                                 *state_guard = PlayerState::Stopped;
@@ -187,9 +179,14 @@ fn main() {
                             cursor.swap(0, Relaxed);
                         }
                         AudioCommand::Pause => {
-                            println!("STOP command");
+                            tracing::info!("Processing PAUSE command");
                             let mut state_guard = state.lock().unwrap();
                             *state_guard = PlayerState::Paused;
+                        }
+                        AudioCommand::Play => {
+                            tracing::info!("Processing PLAY command");
+                            let mut state_guard = state.lock().unwrap();
+                            *state_guard = PlayerState::Playing;
                         }
                         AudioCommand::LoadFile(path) => {
                             let buf = std::io::BufReader::new(
@@ -197,7 +194,8 @@ fn main() {
                             );
                             let mp3_decoder = Mp3Decoder::new(buf)
                                 .expect("Failed to create mp3 decoder from file buffer");
-                            let mut all_mp3_samples_f64 = mp3_decoder.map(|s| s as f64).collect::<Vec<f64>>();
+                            let all_mp3_samples_f64 =
+                                mp3_decoder.map(|s| s as f64).collect::<Vec<f64>>();
                             /*
                             let all_mp3_samples = mp3_decoder.map(|s| s as i16).collect::<Vec<i16>>();
                             let sample_count = all_mp3_samples.len() as f32 / 2.0f32;
@@ -231,11 +229,14 @@ fn main() {
                                 2.0,
                                 params,
                                 left.len(),
-                                2
-                            ).unwrap();
+                                2,
+                            )
+                            .unwrap();
 
                             let channels = vec![left, right];
-                            let resampled_audio = resampler.process(&channels, None).expect("failed to resample audio");
+                            let resampled_audio = resampler
+                                .process(&channels, None)
+                                .expect("failed to resample audio");
                             println!("Finished resampling");
 
                             let zip_audio = resampled_audio[0]
@@ -248,39 +249,49 @@ fn main() {
                                 vec_channels.push(vec![*z.0, *z.1]);
                             }
 
-                            let mut flat_channels = vec_channels
+                            let flat_channels = vec_channels
                                 .iter()
                                 .flatten()
                                 .map(|s| *s as i16)
                                 .collect::<Vec<i16>>();
-                                //.into_iter();
+                            //.into_iter();
 
                             // I think it makes sense to assert that the buffer len is evenly
                             // divisible by the audio channel count before going forward.
                             // Right now I could care less...
                             let sample_count_resampled = *(&flat_channels.len()) as f32 / 2.0f32;
                             current_track_sample_count = sample_count_resampled as u32;
-                            let track_length_in_seconds_resampled = (sample_count_resampled as f32 / desired_sample_rate as f32) as i32;
+                            let track_length_in_seconds_resampled =
+                                (sample_count_resampled as f32 / desired_sample_rate as f32) as i32;
                             println!("resampled: sample_rate: {desired_sample_rate}, sample_count: {sample_count_resampled}, track_length_in_seconds: {track_length_in_seconds_resampled}");
 
+                            cursor.swap(0, Relaxed); // Reset the cursor on every file load after the audio buffer is ready
+
                             // Setup playing
+                            // The cursor and state need to be cloned, as they are Arc'd
+                            // and need to be accessible via the cpal callback
                             let c1 = cursor.clone();
                             let s1 = state.clone();
+
                             let mut next_sample = move || {
                                 // check the state of player...
                                 // if playing, fetch_add the cursor
                                 // if stopped , return 0s and reset the cursor
                                 // if paused, return 0's, don't mutate the cursor
-                                let mut state_guard = s1.lock().unwrap();
+                                let state_guard = s1.lock().unwrap();
                                 match *state_guard {
                                     PlayerState::Paused => 0i16,
                                     PlayerState::Stopped => 0i16,
                                     PlayerState::Playing => {
                                         let c = c1.fetch_add(1, Relaxed);
-                                        //let sample = &all_mp3_samples[c as usize];
-                                        let sample = flat_channels[c as usize];
-                                        //audio_cursor += 1;
-                                        sample
+                                        // Figure out how to wrap all of this as an iter
+                                        if (c as usize) < flat_channels.len() {
+                                            let sample = flat_channels[c as usize];
+                                            sample
+                                        } else {
+                                            0i16
+                                        }
+
                                         /*
                                         //let a = all_mp3_samples.clone();
                                         match samples_iter.next() {
@@ -291,13 +302,6 @@ fn main() {
                                     }
                                 }
                             };
-
-                            /*
-                            println!(
-                                "sample_rate: {}, sample_count: {}, track_length_in_seconds: {}",
-                                &config_sample_rate, &sample_count, &track_length_in_seconds
-                            );
-                            */
 
                             // The actual playing should be done by the player command, but this is
                             // a test.
@@ -326,25 +330,23 @@ fn main() {
                             }
                             .expect("Failed to build output stream");
 
-                            &output_stream.play().unwrap();
-                            audio_output_stream = Some(output_stream); // Assign it to variable
-                                                                       // that doesn't go out of
-                                                                       // scope at the end of the
-                                                                       // loop
+                            // This stream needs to outlive this block, otherwise it'll shut off.
+                            // Easiest way to do this is save the stream in a higher scope's state.
+                            let _ = &output_stream.play().unwrap();
+                            audio_output_stream = Some(output_stream);
                             {
                                 let mut state_guard = state.lock().unwrap();
                                 *state_guard = PlayerState::Playing;
                             }
-                            println!("playing");
                         }
-                        _ => println!("Something else"),
+                        _ => tracing::info!("Unhandled case in audio command loop"),
                     }
                 }
-                Err(_e) => (), //println!("{e:?}!"),
+                Err(_) => (), // When no commands are sent, this will evaluate. aka - it is the
+                              // common case. No need to print anything
             }
         }
     });
-    //app.audio_thread = Some(t);
 
     let mut window_options = eframe::NativeOptions::default();
     window_options.initial_window_size = Some(egui::Vec2::new(1024., 768.));
