@@ -7,6 +7,7 @@ impl AppComponent for PlayerComponent {
     type Context = App;
 
     fn add(ctx: &mut Self::Context, ui: &mut eframe::egui::Ui) {
+        use crate::AudioCommand;
         ui.horizontal(|ui| {
             let stop_btn = ui.button("■");
             let play_btn = ui.button("▶");
@@ -23,12 +24,32 @@ impl AppComponent for PlayerComponent {
             );
             ctx.player.as_mut().unwrap().set_volume(volume);
 
+            // Time Slider
+            let mut seek_in_seconds = ctx.player.as_ref().unwrap().seek_in_seconds;
+            let time_slider = ui.add(
+                eframe::egui::Slider::new(&mut seek_in_seconds, 0..=(3 * 60))
+                    .logarithmic(false)
+                    .show_value(true)
+                    .clamp_to_range(true),
+            );
+            ctx.player
+                .as_mut()
+                .unwrap()
+                .set_seek_in_seconds(seek_in_seconds);
+
+            if time_slider.drag_released() {
+                ctx.player.as_mut().unwrap().seek_to(seek_in_seconds);
+            }
+
             if let Some(_selected_track) = &ctx.player.as_mut().unwrap().selected_track {
                 if stop_btn.clicked() {
                     ctx.player.as_mut().unwrap().stop();
                 }
 
                 if play_btn.clicked() {
+                    //let tx = ctx.audio_sender.as_ref().unwrap().clone();
+                    //let track_path = _selected_track.path().clone();
+                    //tx.send(AudioCommand::LoadFile(track_path)).expect("Failed to send to audio thread");
                     ctx.player.as_mut().unwrap().play();
                 }
 

@@ -1,22 +1,24 @@
 use crate::app::library::LibraryItem;
 use crate::app::playlist::Playlist;
+use crate::AudioCommand;
+use std::sync::mpsc::Sender;
 
 pub struct Player {
     pub track_state: TrackState,
     pub selected_track: Option<LibraryItem>,
-    pub sink: rodio::Sink,
-    pub stream_handle: rodio::OutputStreamHandle,
+    pub audio_tx: Sender<AudioCommand>,
     pub volume: f32,
+    pub seek_in_seconds: u32,
 }
 
 impl Player {
-    pub fn new(sink: rodio::Sink, stream_handle: rodio::OutputStreamHandle) -> Self {
+    pub fn new(audio_cmd_tx: Sender<AudioCommand>) -> Self {
         Self {
             track_state: TrackState::Unstarted,
             selected_track: None,
-            sink: sink,
-            stream_handle: stream_handle,
+            audio_tx: audio_cmd_tx,
             volume: 1.0,
+            seek_in_seconds: 0, // TODO: This should have subsecond precision, but is okay for now.
         }
     }
 
@@ -27,27 +29,46 @@ impl Player {
         }
     }
 
+    pub fn seek_to(&mut self, seconds: u32) {
+        self.seek_in_seconds = seconds;
+        self.audio_tx
+            .send(AudioCommand::Seek(seconds))
+            .expect("Failed to send seek to audio thread");
+    }
+
+    // TODO: Should return Result
     pub fn stop(&mut self) {
         match &self.track_state {
             TrackState::Playing | TrackState::Paused => {
                 self.track_state = TrackState::Stopped;
-                self.sink.stop();
+                self.audio_tx
+                    .send(AudioCommand::Stop)
+                    .expect("Failed to send stop to audio thread");
+                //self.sink.stop();
             }
             _ => (),
         }
     }
 
+    // TODO: Should return Result
     pub fn play(&mut self) {
         if let Some(selected_track) = &self.selected_track {
+            /*
             let file = std::io::BufReader::new(
                 std::fs::File::open(&selected_track.path()).expect("Failed to open file"),
             );
-            let source = rodio::Decoder::new(file).expect("Failed to decode audio file");
+            */
+            //let source = rodio::Decoder::new(file).expect("Failed to decode audio file");
 
             match self.track_state {
                 TrackState::Unstarted | TrackState::Stopped | TrackState::Playing => {
                     self.track_state = TrackState::Playing;
+                    let track_path = selected_track.path();
+                    self.audio_tx
+                        .send(AudioCommand::LoadFile(track_path))
+                        .expect("Failed to send to audio thread");
 
+                    /*
                     let sink_try = rodio::Sink::try_new(&self.stream_handle);
 
                     match sink_try {
@@ -57,25 +78,35 @@ impl Player {
                         }
                         Err(e) => tracing::error!("{:?}", e),
                     }
+                    */
                 }
                 TrackState::Paused => {
                     self.track_state = TrackState::Playing;
-                    self.sink.play();
+                    self.audio_tx
+                        .send(AudioCommand::Play)
+                        .expect("Failed to send play to audio thread");
+                    //self.sink.play();
                 }
             }
         }
     }
 
-    // Toggle pause between paused and playing.
+    // TODO: Should return result
     pub fn pause(&mut self) {
         match self.track_state {
             TrackState::Playing => {
                 self.track_state = TrackState::Paused;
-                self.sink.pause();
+                self.audio_tx
+                    .send(AudioCommand::Pause)
+                    .expect("Failed to send pause to audio thread");
+                //self.sink.pause();
             }
             TrackState::Paused => {
                 self.track_state = TrackState::Playing;
-                self.sink.play();
+                self.audio_tx
+                    .send(AudioCommand::Play)
+                    .expect("Failed to send play to audio thread");
+                //self.sink.play();
             }
             _ => (),
         }
@@ -107,7 +138,11 @@ impl Player {
 
     pub fn set_volume(&mut self, volume: f32) {
         self.volume = volume;
-        self.sink.set_volume(volume);
+        //self.sink.set_volume(volume);
+    }
+
+    pub fn set_seek_in_seconds(&mut self, seek_in_seconds: u32) {
+        self.seek_in_seconds = seek_in_seconds;
     }
 }
 

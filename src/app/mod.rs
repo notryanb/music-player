@@ -10,6 +10,15 @@ mod library;
 pub mod player;
 mod playlist;
 
+pub enum AudioCommand {
+    Stop,
+    Play,
+    Pause,
+    Seek(u32), // Maybe this should represent a duration?
+    LoadFile(std::path::PathBuf),
+    SetVolume(f32),
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct App {
     pub library: Option<Library>,
