@@ -2,6 +2,8 @@ use crate::app::library::LibraryItem;
 use crate::app::playlist::Playlist;
 use crate::AudioCommand;
 use std::sync::mpsc::Sender;
+use std::sync::Arc;
+use std::sync::atomic::AtomicU32;
 
 pub struct Player {
     pub track_state: TrackState,
@@ -9,16 +11,18 @@ pub struct Player {
     pub audio_tx: Sender<AudioCommand>,
     pub volume: f32,
     pub seek_in_seconds: u32,
+    pub cursor: Arc<AtomicU32>,
 }
 
 impl Player {
-    pub fn new(audio_cmd_tx: Sender<AudioCommand>) -> Self {
+    pub fn new(audio_cmd_tx: Sender<AudioCommand>, cursor: Arc<AtomicU32>) -> Self {
         Self {
             track_state: TrackState::Unstarted,
             selected_track: None,
             audio_tx: audio_cmd_tx,
             volume: 1.0,
             seek_in_seconds: 0, // TODO: This should have subsecond precision, but is okay for now.
+            cursor,
         }
     }
 

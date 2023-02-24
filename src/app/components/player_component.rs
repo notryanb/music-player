@@ -1,5 +1,6 @@
 use super::AppComponent;
 use crate::app::App;
+use std::sync::atomic::Ordering::Relaxed;
 
 pub struct PlayerComponent;
 
@@ -8,6 +9,10 @@ impl AppComponent for PlayerComponent {
 
     fn add(ctx: &mut Self::Context, ui: &mut eframe::egui::Ui) {
         ui.horizontal(|ui| {
+            let cursor = &ctx.player.as_ref().unwrap().cursor.load(Relaxed);
+
+            ui.label(format!("C: {cursor}"));
+
             let stop_btn = ui.button("■");
             let play_btn = ui.button("▶");
             let pause_btn = ui.button("⏸");
