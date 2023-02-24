@@ -1,5 +1,6 @@
 use super::AppComponent;
 use crate::app::App;
+use std::sync::atomic::Ordering::Relaxed;
 
 pub struct PlayerComponent;
 
@@ -8,6 +9,15 @@ impl AppComponent for PlayerComponent {
 
     fn add(ctx: &mut Self::Context, ui: &mut eframe::egui::Ui) {
         ui.horizontal(|ui| {
+            let sample_rate = 44_100; // This is bad. I should be storing this per track
+
+            let cursor = &ctx.player.as_ref().unwrap().cursor.load(Relaxed);
+            let current_seconds = (*cursor as f32 / sample_rate as f32) as u32;
+            ctx.player
+                .as_mut()
+                .unwrap()
+                .set_seek_in_seconds(current_seconds);
+
             let stop_btn = ui.button("■");
             let play_btn = ui.button("▶");
             let pause_btn = ui.button("⏸");
@@ -26,7 +36,7 @@ impl AppComponent for PlayerComponent {
             // Time Slider
             let mut seek_in_seconds = ctx.player.as_ref().unwrap().seek_in_seconds;
             let time_slider = ui.add(
-                eframe::egui::Slider::new(&mut seek_in_seconds, 0..=(3 * 60))
+                eframe::egui::Slider::new(&mut seek_in_seconds, 0..=(10 * 60))
                     .logarithmic(false)
                     .show_value(true)
                     .clamp_to_range(true),

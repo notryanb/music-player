@@ -92,24 +92,17 @@ fn main() {
 
     let (tx, rx) = channel();
     let (audio_tx, audio_rx) = channel();
-    let player = Player::new(audio_tx);
+    let cursor = Arc::new(AtomicU32::new(0));
+    let cursor_clone = cursor.clone();
+    let player = Player::new(audio_tx, cursor);
 
     let mut app = App::load().unwrap_or_default();
     app.player = Some(player);
     app.library_sender = Some(tx);
     app.library_receiver = Some(rx);
-    //app.audio_sender = Some(audio_tx);
 
     let _audio_thread = thread::spawn(move || {
-        // This is basically going to be an audio engine completely decoupled from the GUI app and
-        // expects commands as input
-        // state
-        // option current track
-        // audio result sender which can send back current playing data
-        // Needs the mp3 Decoder
-        // CPAL audio system
-        // Command engine
-        // playback cursor
+        let cursor = cursor_clone;
         let host = cpal::default_host();
         let device = host.default_output_device().unwrap();
         let mut supported_config_types = device
@@ -128,7 +121,6 @@ fn main() {
         let desired_sample_rate = 44_100;
         tracing::info!("config sample rate: {config_sample_rate}");
 
-        let cursor = Arc::new(AtomicU32::new(0));
         let current_track_sample_rate = desired_sample_rate;
 
         let mut audio_output_stream = None;

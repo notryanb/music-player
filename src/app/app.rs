@@ -18,6 +18,8 @@ impl eframe::App for App {
             frame.close();
         }
 
+        ctx.request_repaint();
+
         if let Some(rx) = &self.library_receiver {
             match rx.try_recv() {
                 Ok(library) => {
