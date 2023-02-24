@@ -113,8 +113,6 @@ impl AppComponent for LibraryComponent {
                                 eframe::egui::RichText::new(&container.name),
                             )
                             .default_open(false)
-                            // TODO: Change selectable to CollapsingHeader::selectable
-                            .selectable(true)
                             .show(ui, |ui| {
                                 for item in &container.items {
                                     let item_label = ui.add(
