@@ -1,9 +1,9 @@
 use crate::app::library::LibraryItem;
 use crate::app::playlist::Playlist;
 use crate::AudioCommand;
+use std::sync::atomic::AtomicU32;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
-use std::sync::atomic::AtomicU32;
 
 pub struct Player {
     pub track_state: TrackState,
@@ -11,7 +11,7 @@ pub struct Player {
     pub audio_tx: Sender<AudioCommand>,
     pub volume: f32,
     pub seek_in_seconds: u32,
-    pub cursor: Arc<AtomicU32>,
+    pub cursor: Arc<AtomicU32>, // This can "overflow"
 }
 
 impl Player {

@@ -121,7 +121,6 @@ fn main() {
         let desired_sample_rate = 44_100;
         tracing::info!("config sample rate: {config_sample_rate}");
 
-        //let cursor = Arc::new(AtomicU32::new(0));
         let current_track_sample_rate = desired_sample_rate;
 
         let mut audio_output_stream = None;
