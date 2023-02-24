@@ -3,7 +3,7 @@ pub use crate::app::App;
 pub use crate::app::*;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Sample, SampleFormat};
+use cpal::SampleFormat;
 use eframe::egui;
 use minimp3::{Decoder, Frame};
 use rubato::{InterpolationParameters, InterpolationType, Resampler, SincFixedIn, WindowFunction};
@@ -86,25 +86,6 @@ pub enum PlayerState {
     Paused,
 }
 
-pub struct AudioPlayer {
-    state: PlayerState,
-    //buffer: Vec<i16>, // This will eventually need to be generic
-    //buffer_len: usize,
-    buffer_cursor: usize,
-}
-
-impl AudioPlayer {
-    fn new() -> Self {
-        let default_buffer_size = 1024;
-        Self {
-            state: PlayerState::Stopped,
-            //buffer: vec![0; default_buffer_size];
-            //buffer_len: default_buffer_size,
-            buffer_cursor: 0,
-        }
-    }
-}
-
 fn main() {
     tracing_subscriber::fmt::init();
     tracing::info!("App booting...");
@@ -119,7 +100,7 @@ fn main() {
     app.library_receiver = Some(rx);
     //app.audio_sender = Some(audio_tx);
 
-    let audio_thread = thread::spawn(move || {
+    let _audio_thread = thread::spawn(move || {
         // This is basically going to be an audio engine completely decoupled from the GUI app and
         // expects commands as input
         // state
@@ -139,23 +120,16 @@ fn main() {
             .expect("Hmm.... no output support config?")
             .with_max_sample_rate();
 
-        let output_err_fn = |err| eprintln!("an error occurred in the output audio stream {}", err);
+        let output_err_fn =
+            |err| tracing::error!("an error occurred in the output audio stream {}", err);
         let sample_format = supported_config.sample_format();
         let config: cpal::StreamConfig = supported_config.into();
         let config_sample_rate = config.sample_rate.0 as f32;
         let desired_sample_rate = 44_100;
-        println!("config sample rate: {config_sample_rate}");
+        tracing::info!("config sample rate: {config_sample_rate}");
 
-        // it looks like anything i want to modify between the cpal thread and here needs
-        // to go into a threadsafe struct
-
-        let audio_cursor: usize = 0;
         let cursor = Arc::new(AtomicU32::new(0));
-        let mut current_track_sample_count = 0;
-        let mut current_track_sample_rate = 0;
-        current_track_sample_rate = desired_sample_rate;
-
-        //let mut all_mp3_samples: Vec<i16> = Vec::new();
+        let current_track_sample_rate = desired_sample_rate;
 
         let mut audio_output_stream = None;
         let state = Arc::new(Mutex::new(PlayerState::Stopped));
@@ -215,7 +189,7 @@ fn main() {
                             }
 
                             assert!(left.len() == right.len());
-                            println!("About to resample");
+                            tracing::info!("About to resample");
                             let params = InterpolationParameters {
                                 sinc_len: 256,
                                 f_cutoff: 0.95,
@@ -237,7 +211,7 @@ fn main() {
                             let resampled_audio = resampler
                                 .process(&channels, None)
                                 .expect("failed to resample audio");
-                            println!("Finished resampling");
+                            tracing::info!("Finished resampling");
 
                             let zip_audio = resampled_audio[0]
                                 .iter()
@@ -260,10 +234,9 @@ fn main() {
                             // divisible by the audio channel count before going forward.
                             // Right now I could care less...
                             let sample_count_resampled = *(&flat_channels.len()) as f32 / 2.0f32;
-                            current_track_sample_count = sample_count_resampled as u32;
                             let track_length_in_seconds_resampled =
                                 (sample_count_resampled as f32 / desired_sample_rate as f32) as i32;
-                            println!("resampled: sample_rate: {desired_sample_rate}, sample_count: {sample_count_resampled}, track_length_in_seconds: {track_length_in_seconds_resampled}");
+                            tracing::info!("resampled: sample_rate: {desired_sample_rate}, sample_count: {sample_count_resampled}, track_length_in_seconds: {track_length_in_seconds_resampled}");
 
                             cursor.swap(0, Relaxed); // Reset the cursor on every file load after the audio buffer is ready
 
@@ -332,8 +305,18 @@ fn main() {
 
                             // This stream needs to outlive this block, otherwise it'll shut off.
                             // Easiest way to do this is save the stream in a higher scope's state.
+
+                            // This is the first annoying lint I've encountered. The audio output
+                            // stream needs to be cached into a variable outside the loop that will
+                            // last the duration of the program. This is because the stream will be
+                            // dropped and playback will end. This means we're doing a second
+                            // assignment before reading the variable, which is fine, but clippy
+                            // complains. To get rid of this, make a simple `let` binding right
+                            // before.
+                            let _ = audio_output_stream;
                             let _ = &output_stream.play().unwrap();
                             audio_output_stream = Some(output_stream);
+
                             {
                                 let mut state_guard = state.lock().unwrap();
                                 *state_guard = PlayerState::Playing;

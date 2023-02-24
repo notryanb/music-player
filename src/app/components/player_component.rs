@@ -7,7 +7,6 @@ impl AppComponent for PlayerComponent {
     type Context = App;
 
     fn add(ctx: &mut Self::Context, ui: &mut eframe::egui::Ui) {
-        use crate::AudioCommand;
         ui.horizontal(|ui| {
             let stop_btn = ui.button("■");
             let play_btn = ui.button("▶");
@@ -47,9 +46,6 @@ impl AppComponent for PlayerComponent {
                 }
 
                 if play_btn.clicked() {
-                    //let tx = ctx.audio_sender.as_ref().unwrap().clone();
-                    //let track_path = _selected_track.path().clone();
-                    //tx.send(AudioCommand::LoadFile(track_path)).expect("Failed to send to audio thread");
                     ctx.player.as_mut().unwrap().play();
                 }
 
