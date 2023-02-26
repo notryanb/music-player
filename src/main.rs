@@ -17,6 +17,29 @@ use std::thread;
 
 mod app;
 
+pub struct AudioBuffer {
+    pub data: Vec<i16>,
+}
+
+impl AudioBuffer {
+    pub fn new() -> Self {
+        Self {
+            data: vec![0; 40960],
+        }
+    }
+
+    pub fn get_sample(&self, idx: usize) -> i16 {
+        if idx > &self.data.len() - 1 {
+            return 0;
+        }
+        self.data[idx]
+    }
+
+    pub fn append_sample(&mut self, sample: i16) {
+        self.data.push(sample);
+    }
+}
+
 pub struct Mp3Decoder<R>
 where
     R: Read + Seek,
@@ -64,10 +87,9 @@ where
             self.current_frame_offset = 0;
         }
 
-        let v = self.current_frame.data[self.current_frame_offset];
+        let frame_value  = self.current_frame.data[self.current_frame_offset];
         self.current_frame_offset += 1;
-
-        Some(v)
+        Some(frame_value)
     }
 }
 
@@ -92,6 +114,7 @@ fn main() {
 
     let (tx, rx) = channel();
     let (audio_tx, audio_rx) = channel();
+    let (buffer_tx, buffer_rx) = channel();
     let cursor = Arc::new(AtomicU32::new(0));
     let cursor_clone = cursor.clone();
     let player = Player::new(audio_tx, cursor);
@@ -122,12 +145,20 @@ fn main() {
         tracing::info!("config sample rate: {config_sample_rate}");
 
         let current_track_sample_rate = desired_sample_rate;
-
+        let audio_buffer = Arc::new(Mutex::new(AudioBuffer::new()));
         let mut audio_output_stream = None;
         let state = Arc::new(Mutex::new(PlayerState::Stopped));
 
         // Audio processing loop
         loop {
+            match buffer_rx.try_recv() {
+                Ok(sample) => {
+                    let mut guard = audio_buffer.lock().unwrap();
+                    guard.append_sample(sample);
+                },
+                Err(_) => (),
+            };
+
             let result = audio_rx.try_recv();
             match result {
                 Ok(cmd) => {
@@ -155,88 +186,116 @@ fn main() {
                             *state_guard = PlayerState::Playing;
                         }
                         AudioCommand::LoadFile(path) => {
-                            let buf = std::io::BufReader::new(
-                                File::open(&path).expect("couldn't open file"),
-                            );
-                            let mp3_decoder = Mp3Decoder::new(buf)
-                                .expect("Failed to create mp3 decoder from file buffer");
-                            let all_mp3_samples_f64 =
-                                mp3_decoder.map(|s| s as f64).collect::<Vec<f64>>();
-                            /*
-                            let all_mp3_samples = mp3_decoder.map(|s| s as i16).collect::<Vec<i16>>();
-                            let sample_count = all_mp3_samples.len() as f32 / 2.0f32;
-                            let track_length_in_seconds = sample_count / desired_sample_rate as f32;
-                            */
-                            //let mut samples_iter = all_mp3_samples.into_iter();
+                            let b_tx = buffer_tx.clone();
+                            let ab = audio_buffer.clone();
+                            let c5 = cursor.clone();
+                            thread::spawn(move || {
+                                let buf = std::io::BufReader::new(
+                                    File::open(&path).expect("couldn't open file"),
+                                );
+                                let mut mp3_decoder = Mp3Decoder::new(buf)
+                                    .expect("Failed to create mp3 decoder from file buffer");
 
-                            // Resample Audio
-                            let mut left = vec![];
-                            let mut right = vec![];
-                            for (idx, sample) in all_mp3_samples_f64.iter().enumerate() {
-                                if idx % 2 == 0 {
-                                    left.push(*sample);
-                                } else {
-                                    right.push(*sample);
+                                {
+                                    let mut guard = ab.lock().unwrap();
+                                    guard.data = vec![0, 4096];
                                 }
-                            }
 
-                            assert!(left.len() == right.len());
-                            tracing::info!("About to resample");
-                            let params = InterpolationParameters {
-                                sinc_len: 256,
-                                f_cutoff: 0.95,
-                                interpolation: InterpolationType::Linear,
-                                oversampling_factor: 256,
-                                window: WindowFunction::BlackmanHarris2,
-                            };
+                                c5.swap(0, Relaxed); // Reset the cursor on every file load after the audio buffer is ready
+                                while let Some(sample) = mp3_decoder.next() {
+                                    match b_tx.send(sample) {
+                                        Ok(_) => (),
+                                        Err(_) => (),
+                                    }
+                                }
+                            });
+                            /*
+                            
+                                    let buf = std::io::BufReader::new(
+                                        File::open(&path).expect("couldn't open file"),
+                                    );
+                                    let mp3_decoder = Mp3Decoder::new(buf)
+                                        .expect("Failed to create mp3 decoder from file buffer");
+                                    let all_mp3_samples_f64 =
+                                        mp3_decoder.map(|s| s as f64).collect::<Vec<f64>>();
+                                    /*
+                                    let all_mp3_samples = mp3_decoder.map(|s| s as i16).collect::<Vec<i16>>();
+                                    let sample_count = all_mp3_samples.len() as f32 / 2.0f32;
+                                    let track_length_in_seconds = sample_count / desired_sample_rate as f32;
+                                    */
+                                    //let mut samples_iter = all_mp3_samples.into_iter();
 
-                            let mut resampler = SincFixedIn::<f64>::new(
-                                48_000 as f64 / desired_sample_rate as f64, // should be using config_sample_rate / the mp3's sample_rate
-                                2.0,
-                                params,
-                                left.len(),
-                                2,
-                            )
-                            .unwrap();
+                                    // Resample Audio
+                                    let mut left = vec![];
+                                    let mut right = vec![];
+                                    for (idx, sample) in all_mp3_samples_f64.iter().enumerate() {
+                                        if idx % 2 == 0 {
+                                            left.push(*sample);
+                                        } else {
+                                            right.push(*sample);
+                                        }
+                                    }
 
-                            let channels = vec![left, right];
-                            let resampled_audio = resampler
-                                .process(&channels, None)
-                                .expect("failed to resample audio");
-                            tracing::info!("Finished resampling");
+                                    assert!(left.len() == right.len());
+                                    tracing::info!("About to resample");
+                                    let params = InterpolationParameters {
+                                        sinc_len: 256,
+                                        f_cutoff: 0.95,
+                                        interpolation: InterpolationType::Linear,
+                                        oversampling_factor: 256,
+                                        window: WindowFunction::BlackmanHarris2,
+                                    };
 
-                            let zip_audio = resampled_audio[0]
-                                .iter()
-                                .zip(&resampled_audio[1])
-                                .collect::<Vec<(&f64, &f64)>>();
+                                    let mut resampler = SincFixedIn::<f64>::new(
+                                        48_000 as f64 / desired_sample_rate as f64, // should be using config_sample_rate / the mp3's sample_rate
+                                        2.0,
+                                        params,
+                                        left.len(),
+                                        2,
+                                    )
+                                    .unwrap();
 
-                            let mut vec_channels = vec![];
-                            for z in zip_audio {
-                                vec_channels.push(vec![*z.0, *z.1]);
-                            }
+                                    let channels = vec![left, right];
+                                    let resampled_audio = resampler
+                                        .process(&channels, None)
+                                        .expect("failed to resample audio");
+                                    tracing::info!("Finished resampling");
 
-                            let flat_channels = vec_channels
-                                .iter()
-                                .flatten()
-                                .map(|s| *s as i16)
-                                .collect::<Vec<i16>>();
-                            //.into_iter();
+                                    let zip_audio = resampled_audio[0]
+                                        .iter()
+                                        .zip(&resampled_audio[1])
+                                        .collect::<Vec<(&f64, &f64)>>();
 
-                            // I think it makes sense to assert that the buffer len is evenly
-                            // divisible by the audio channel count before going forward.
-                            // Right now I could care less...
-                            let sample_count_resampled = *(&flat_channels.len()) as f32 / 2.0f32;
-                            let track_length_in_seconds_resampled =
-                                (sample_count_resampled as f32 / desired_sample_rate as f32) as i32;
-                            tracing::info!("resampled: sample_rate: {desired_sample_rate}, sample_count: {sample_count_resampled}, track_length_in_seconds: {track_length_in_seconds_resampled}");
+                                    let mut vec_channels = vec![];
+                                    for z in zip_audio {
+                                        vec_channels.push(vec![*z.0, *z.1]);
+                                    }
 
-                            cursor.swap(0, Relaxed); // Reset the cursor on every file load after the audio buffer is ready
+                                    let flat_channels = vec_channels
+                                        .iter()
+                                        .flatten()
+                                        .map(|s| *s as i16)
+                                        .collect::<Vec<i16>>();
+                                    //.into_iter();
+
+                                    // I think it makes sense to assert that the buffer len is evenly
+                                    // divisible by the audio channel count before going forward.
+                                    // Right now I could care less...
+                                    let sample_count_resampled = *(&flat_channels.len()) as f32 / 2.0f32;
+                                    let track_length_in_seconds_resampled =
+                                        (sample_count_resampled as f32 / desired_sample_rate as f32) as i32;
+                                    tracing::info!("resampled: sample_rate: {desired_sample_rate},\
+                                                sample_count: {sample_count_resampled}, \
+                                                track_length_in_seconds: {track_length_in_seconds_resampled}");
+                            */
+
 
                             // Setup playing
                             // The cursor and state need to be cloned, as they are Arc'd
                             // and need to be accessible via the cpal callback
                             let c1 = cursor.clone();
                             let s1 = state.clone();
+                            let ab = audio_buffer.clone();
 
                             let mut next_sample = move || {
                                 // check the state of player...
@@ -249,21 +308,10 @@ fn main() {
                                     PlayerState::Stopped => 0i16,
                                     PlayerState::Playing => {
                                         let c = c1.fetch_add(1, Relaxed);
-                                        // Figure out how to wrap all of this as an iter
-                                        if (c as usize) < flat_channels.len() {
-                                            let sample = flat_channels[c as usize];
-                                            sample
-                                        } else {
-                                            0i16
+                                        {
+                                            let guard = ab.lock().unwrap();
+                                            guard.get_sample(c as usize)
                                         }
-
-                                        /*
-                                        //let a = all_mp3_samples.clone();
-                                        match samples_iter.next() {
-                                            Some(sample) => sample,
-                                            None => 0i16,
-                                        }
-                                        */
                                     }
                                 }
                             };
