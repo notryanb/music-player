@@ -57,13 +57,6 @@ impl Player {
     // TODO: Should return Result
     pub fn play(&mut self) {
         if let Some(selected_track) = &self.selected_track {
-            /*
-            let file = std::io::BufReader::new(
-                std::fs::File::open(&selected_track.path()).expect("Failed to open file"),
-            );
-            */
-            //let source = rodio::Decoder::new(file).expect("Failed to decode audio file");
-
             match self.track_state {
                 TrackState::Unstarted | TrackState::Stopped | TrackState::Playing => {
                     self.track_state = TrackState::Playing;
@@ -71,25 +64,12 @@ impl Player {
                     self.audio_tx
                         .send(AudioCommand::LoadFile(track_path))
                         .expect("Failed to send to audio thread");
-
-                    /*
-                    let sink_try = rodio::Sink::try_new(&self.stream_handle);
-
-                    match sink_try {
-                        Ok(sink) => {
-                            self.sink = sink;
-                            self.sink.append(source);
-                        }
-                        Err(e) => tracing::error!("{:?}", e),
-                    }
-                    */
                 }
                 TrackState::Paused => {
                     self.track_state = TrackState::Playing;
                     self.audio_tx
                         .send(AudioCommand::Play)
                         .expect("Failed to send play to audio thread");
-                    //self.sink.play();
                 }
             }
         }
@@ -103,14 +83,12 @@ impl Player {
                 self.audio_tx
                     .send(AudioCommand::Pause)
                     .expect("Failed to send pause to audio thread");
-                //self.sink.pause();
             }
             TrackState::Paused => {
                 self.track_state = TrackState::Playing;
                 self.audio_tx
                     .send(AudioCommand::Play)
                     .expect("Failed to send play to audio thread");
-                //self.sink.play();
             }
             _ => (),
         }

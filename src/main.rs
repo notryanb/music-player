@@ -7,9 +7,10 @@ use cpal::SampleFormat;
 use eframe::egui;
 use minimp3::{Decoder, Frame};
 use rubato::{InterpolationParameters, InterpolationType, Resampler, SincFixedIn, WindowFunction};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Seek};
-use std::sync::atomic::{AtomicU32, Ordering::*};
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering::*};
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -17,17 +18,65 @@ use std::thread;
 
 mod app;
 
+// This holds several buffers
+pub struct AudioBank {
+    pub buffers: HashMap<usize, AudioBuffer>,
+    pub count: usize, // This can be replaced if we randomize the key for the map
+    pub currently_playing_buffer: usize, // TODO: Turn the datatype into some sort of key which can be used in the hashmap
+}
+
+impl AudioBank {
+    pub fn new() -> Self {
+        Self {
+            buffers: HashMap::new(),
+            count: 0,
+            currently_playing_buffer: 0,
+        }
+    }
+
+    pub fn insert(&mut self, buffer: AudioBuffer) -> usize {
+        let key = self.count;
+        self.buffers.insert(key, buffer);
+        self.count += 1;
+        key
+    }
+
+    pub fn append_sample(&mut self, key: usize, sample: i16) {
+        if let Some(buffer) = self.buffers.get_mut(&key) {
+            buffer.append_sample(sample);
+        }
+    }
+
+    pub fn get_sample(&self, sample_idx: usize) -> i16 {
+        if let Some(buffer) = self.buffers.get(&self.currently_playing_buffer) {
+            buffer.get_sample(sample_idx)
+        } else {
+            0i16
+        }
+    }
+
+    pub fn select_buffer(&mut self, key: usize) {
+        if self.buffers.get(&key).is_some() {
+            self.currently_playing_buffer = key;
+        }
+    }
+}
+
 pub struct AudioBuffer {
     pub data: Vec<i16>,
+    pub samples_len: usize, // This should be updated by the Mp3Decoder when it is done processing
+                            // samples
 }
 
 impl AudioBuffer {
     pub fn new() -> Self {
         Self {
-            data: vec![0; 40960],
+            data: vec![0; 1024],
+            samples_len: 0,
         }
     }
 
+    // Think about returning an Option....
     pub fn get_sample(&self, idx: usize) -> i16 {
         if idx > &self.data.len() - 1 {
             return 0;
@@ -87,7 +136,7 @@ where
             self.current_frame_offset = 0;
         }
 
-        let frame_value  = self.current_frame.data[self.current_frame_offset];
+        let frame_value = self.current_frame.data[self.current_frame_offset];
         self.current_frame_offset += 1;
         Some(frame_value)
     }
@@ -114,7 +163,7 @@ fn main() {
 
     let (tx, rx) = channel();
     let (audio_tx, audio_rx) = channel();
-    let (buffer_tx, buffer_rx) = channel();
+    //let (buffer_tx, buffer_rx) = channel();
     let cursor = Arc::new(AtomicU32::new(0));
     let cursor_clone = cursor.clone();
     let player = Player::new(audio_tx, cursor);
@@ -145,22 +194,67 @@ fn main() {
         tracing::info!("config sample rate: {config_sample_rate}");
 
         let current_track_sample_rate = desired_sample_rate;
-        let audio_buffer = Arc::new(Mutex::new(AudioBuffer::new()));
-        let mut audio_output_stream = None;
+        let audio_buffers = Arc::new(Mutex::new(AudioBank::new()));
         let state = Arc::new(Mutex::new(PlayerState::Stopped));
+
+        let c1 = cursor.clone();
+        let s1 = state.clone();
+        let ab = audio_buffers.clone();
+        //let abk = audio_buffers_key.clone();
+
+        let mut next_sample = move || {
+            let state_guard = s1.lock().unwrap();
+            match *state_guard {
+                PlayerState::Playing => {
+                    let c = c1.fetch_add(1, Relaxed);
+                    {
+                        let guard = ab.lock().unwrap();
+                        guard.get_sample(c as usize)
+                    }
+                }
+                _ => 0i16,
+            }
+        };
+
+        // The actual playing should be done by the player command, but this is
+        // a test.
+        let output_stream = match sample_format {
+            SampleFormat::F32 => device.build_output_stream(
+                &config,
+                move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                    write_sample(data, &mut next_sample)
+                },
+                output_err_fn,
+            ),
+            SampleFormat::I16 => device.build_output_stream(
+                &config,
+                move |data: &mut [i16], _: &cpal::OutputCallbackInfo| {
+                    write_sample(data, &mut next_sample)
+                },
+                output_err_fn,
+            ),
+            SampleFormat::U16 => device.build_output_stream(
+                &config,
+                move |data: &mut [u16], _: &cpal::OutputCallbackInfo| {
+                    write_sample(data, &mut next_sample)
+                },
+                output_err_fn,
+            ),
+        }
+        .expect("Failed to build output stream");
+
+        // This stream needs to outlive this block, otherwise it'll shut off.
+        // Easiest way to do this is save the stream in a higher scope's state.
+        let _ = &output_stream.play().unwrap();
+
+        {
+            let mut state_guard = state.lock().unwrap();
+            *state_guard = PlayerState::Playing;
+        }
 
         // Audio processing loop
         loop {
-            match buffer_rx.try_recv() {
-                Ok(sample) => {
-                    let mut guard = audio_buffer.lock().unwrap();
-                    guard.append_sample(sample);
-                },
-                Err(_) => (),
-            };
-
-            let result = audio_rx.try_recv();
-            match result {
+            match audio_rx.try_recv() {
                 Ok(cmd) => {
                     match cmd {
                         AudioCommand::Seek(seconds) => {
@@ -186,31 +280,47 @@ fn main() {
                             *state_guard = PlayerState::Playing;
                         }
                         AudioCommand::LoadFile(path) => {
-                            let b_tx = buffer_tx.clone();
-                            let ab = audio_buffer.clone();
-                            let c5 = cursor.clone();
+                            let ab = audio_buffers.clone();
+                            let buf = std::io::BufReader::new(
+                                File::open(&path).expect("couldn't open file"),
+                            );
+                            let mut mp3_decoder = Mp3Decoder::new(buf)
+                                .expect("Failed to create mp3 decoder from file buffer");
+
+                            let audio_buffer = AudioBuffer::new();
+
+                            // I think it makes sense to generate key + file on the gui side and
+                            // pass that in. Otherwise I think everytime this gets called, the same
+                            // track will get a new buffer, but we want the existing one.
+                            // TODO: - I think it is worth exploring creating audio buffers when
+                            // tracks are added to a playlist, not when they're selected. This way
+                            // the entire playlist is loaded into memory and the currently playing
+                            // buffer is less likely to be starved. When a track is loaded into the
+                            // playlist. Think about who creates the key... the AudioBank or the
+                            // Player.
+
+                            // TODO: Create debug windows that show buffer stats with progress
+                            // bars?
+                            let mut key = 0;
+                            {
+                                let mut guard = ab.lock().unwrap();
+                                key = guard.insert(audio_buffer);
+                                guard.select_buffer(key);
+                            }
+
+                            cursor.swap(0, Relaxed); // Reset the cursor on every file load after the audio buffer is ready
+
+                            // Immediately start filling the buffer
                             thread::spawn(move || {
-                                let buf = std::io::BufReader::new(
-                                    File::open(&path).expect("couldn't open file"),
-                                );
-                                let mut mp3_decoder = Mp3Decoder::new(buf)
-                                    .expect("Failed to create mp3 decoder from file buffer");
-
-                                {
-                                    let mut guard = ab.lock().unwrap();
-                                    guard.data = vec![0, 4096];
-                                }
-
-                                c5.swap(0, Relaxed); // Reset the cursor on every file load after the audio buffer is ready
                                 while let Some(sample) = mp3_decoder.next() {
-                                    match b_tx.send(sample) {
-                                        Ok(_) => (),
-                                        Err(_) => (),
+                                    {
+                                        let mut guard = ab.lock().unwrap();
+                                        guard.append_sample(key, sample);
                                     }
                                 }
                             });
                             /*
-                            
+
                                     let buf = std::io::BufReader::new(
                                         File::open(&path).expect("couldn't open file"),
                                     );
@@ -288,79 +398,6 @@ fn main() {
                                                 sample_count: {sample_count_resampled}, \
                                                 track_length_in_seconds: {track_length_in_seconds_resampled}");
                             */
-
-
-                            // Setup playing
-                            // The cursor and state need to be cloned, as they are Arc'd
-                            // and need to be accessible via the cpal callback
-                            let c1 = cursor.clone();
-                            let s1 = state.clone();
-                            let ab = audio_buffer.clone();
-
-                            let mut next_sample = move || {
-                                // check the state of player...
-                                // if playing, fetch_add the cursor
-                                // if stopped , return 0s and reset the cursor
-                                // if paused, return 0's, don't mutate the cursor
-                                let state_guard = s1.lock().unwrap();
-                                match *state_guard {
-                                    PlayerState::Paused => 0i16,
-                                    PlayerState::Stopped => 0i16,
-                                    PlayerState::Playing => {
-                                        let c = c1.fetch_add(1, Relaxed);
-                                        {
-                                            let guard = ab.lock().unwrap();
-                                            guard.get_sample(c as usize)
-                                        }
-                                    }
-                                }
-                            };
-
-                            // The actual playing should be done by the player command, but this is
-                            // a test.
-                            let output_stream = match sample_format {
-                                SampleFormat::F32 => device.build_output_stream(
-                                    &config,
-                                    move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                                        write_sample(data, &mut next_sample)
-                                    },
-                                    output_err_fn,
-                                ),
-                                SampleFormat::I16 => device.build_output_stream(
-                                    &config,
-                                    move |data: &mut [i16], _: &cpal::OutputCallbackInfo| {
-                                        write_sample(data, &mut next_sample)
-                                    },
-                                    output_err_fn,
-                                ),
-                                SampleFormat::U16 => device.build_output_stream(
-                                    &config,
-                                    move |data: &mut [u16], _: &cpal::OutputCallbackInfo| {
-                                        write_sample(data, &mut next_sample)
-                                    },
-                                    output_err_fn,
-                                ),
-                            }
-                            .expect("Failed to build output stream");
-
-                            // This stream needs to outlive this block, otherwise it'll shut off.
-                            // Easiest way to do this is save the stream in a higher scope's state.
-
-                            // This is the first annoying lint I've encountered. The audio output
-                            // stream needs to be cached into a variable outside the loop that will
-                            // last the duration of the program. This is because the stream will be
-                            // dropped and playback will end. This means we're doing a second
-                            // assignment before reading the variable, which is fine, but clippy
-                            // complains. To get rid of this, make a simple `let` binding right
-                            // before.
-                            let _ = audio_output_stream;
-                            let _ = &output_stream.play().unwrap();
-                            audio_output_stream = Some(output_stream);
-
-                            {
-                                let mut state_guard = state.lock().unwrap();
-                                *state_guard = PlayerState::Playing;
-                            }
                         }
                         _ => tracing::info!("Unhandled case in audio command loop"),
                     }
