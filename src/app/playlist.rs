@@ -1,5 +1,7 @@
 use crate::app::LibraryItem;
 use serde::{Deserialize, Serialize};
+use crate::AudioCommand;
+use std::sync::mpsc::Sender;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Playlist {
@@ -25,7 +27,13 @@ impl Playlist {
         self.name.clone()
     }
 
-    pub fn add(&mut self, track: LibraryItem) {
+    pub fn add(&mut self, track: LibraryItem, audio_cmd_tx: &Sender<AudioCommand>) {
+        let track_path = &track.path().clone();
+        let key = &track.key();
+        audio_cmd_tx
+            .send(AudioCommand::LoadFile((*track_path.clone()).to_path_buf(), *key))
+            .expect("Failed to send to audio thread");
+
         self.tracks.push(track);
     }
 
@@ -41,8 +49,15 @@ impl Playlist {
     }
 
     // TODO - should probably return a Result
-    pub fn select(&mut self, idx: usize) {
-        self.selected = Some(self.tracks[idx].clone());
+    pub fn select(&mut self, idx: usize, audio_cmd_tx: &Sender<AudioCommand>) {
+        tracing::info!("SELECTED");
+        let track = self.tracks[idx].clone();
+        let key = &track.key();
+        audio_cmd_tx
+            .send(AudioCommand::Select(*key))
+            .expect("Failed to send to audio thread");
+
+        self.selected = Some(track);
     }
 
     pub fn get_pos(&self, track: &LibraryItem) -> Option<usize> {

@@ -1651,6 +1651,7 @@ dependencies = [
  "id3",
  "itertools",
  "minimp3",
+ "rand",
  "rayon",
  "rfd",
  "rubato",

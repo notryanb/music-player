@@ -12,6 +12,8 @@ impl AppComponent for LibraryComponent {
     type Context = App;
 
     fn add(ctx: &mut Self::Context, ui: &mut eframe::egui::Ui) {
+        let audio_cmd_tx = &ctx.player.as_ref().unwrap().audio_tx;
+
         eframe::egui::ScrollArea::both().show(ui, |ui| {
             // TODO - Store library paths and only import if the library path doesn't already exist
             if ui.button("Add Library path").clicked() {
@@ -129,7 +131,7 @@ impl AppComponent for LibraryComponent {
                                             let current_playlist =
                                                 &mut ctx.playlists[*current_playlist_idx];
 
-                                            current_playlist.add(item.clone());
+                                            current_playlist.add(item.clone(), &audio_cmd_tx);
                                         }
                                     }
                                 }
@@ -140,7 +142,7 @@ impl AppComponent for LibraryComponent {
 
                                 if library_group.header_response.double_clicked() {
                                     for item in items {
-                                        current_playlist.add(item.clone());
+                                        current_playlist.add(item.clone(), &audio_cmd_tx);
                                     }
                                 }
                             }

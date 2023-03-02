@@ -10,7 +10,7 @@ use rubato::{InterpolationParameters, InterpolationType, Resampler, SincFixedIn,
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Seek};
-use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering::*};
+use std::sync::atomic::{AtomicU32, Ordering::*};
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -34,16 +34,25 @@ impl AudioBank {
         }
     }
 
-    pub fn insert(&mut self, buffer: AudioBuffer) -> usize {
-        let key = self.count;
+    pub fn insert(&mut self, key: usize, buffer: AudioBuffer) {
         self.buffers.insert(key, buffer);
-        self.count += 1;
-        key
     }
 
+
+    // TODO - probably want to lock the buffer for writes by whatever is using this.
+    // I think reading while locked for writing is okay...?
     pub fn append_sample(&mut self, key: usize, sample: i16) {
         if let Some(buffer) = self.buffers.get_mut(&key) {
             buffer.append_sample(sample);
+        }
+    }
+
+    pub fn append_samples(&mut self, key: usize, samples: Vec<i16>) {
+        if let Some(buffer) = self.buffers.get_mut(&key) {
+            // TODO: probably want to make this one append all instead of individual calls
+            for sample in samples {
+                buffer.append_sample(sample);
+            }
         }
     }
 
@@ -163,7 +172,6 @@ fn main() {
 
     let (tx, rx) = channel();
     let (audio_tx, audio_rx) = channel();
-    //let (buffer_tx, buffer_rx) = channel();
     let cursor = Arc::new(AtomicU32::new(0));
     let cursor_clone = cursor.clone();
     let player = Player::new(audio_tx, cursor);
@@ -279,12 +287,27 @@ fn main() {
                             let mut state_guard = state.lock().unwrap();
                             *state_guard = PlayerState::Playing;
                         }
-                        AudioCommand::LoadFile(path) => {
+                        AudioCommand::Select(key) => {
+                            tracing::info!("Processing SELECT {}", &key);
+                            let ab = audio_buffers.clone();
+                            {
+                                let mut guard = ab.lock().unwrap();
+                                guard.select_buffer(key);
+                            }
+
+                            cursor.swap(0, Relaxed); // Reset the cursor on every file load after the audio buffer is ready
+                        }
+                        // This shouldn't affect the player state at all.
+                        // It only happens when a file is supposed to be loaded...
+                        // ideally from adding it to a playlist
+                        AudioCommand::LoadFile(path, key) => {
+                            tracing::info!("Loading a file - {}", &path.display());
+
                             let ab = audio_buffers.clone();
                             let buf = std::io::BufReader::new(
                                 File::open(&path).expect("couldn't open file"),
                             );
-                            let mut mp3_decoder = Mp3Decoder::new(buf)
+                            let mp3_decoder = Mp3Decoder::new(buf)
                                 .expect("Failed to create mp3 decoder from file buffer");
 
                             let audio_buffer = AudioBuffer::new();
@@ -301,103 +324,76 @@ fn main() {
 
                             // TODO: Create debug windows that show buffer stats with progress
                             // bars?
-                            let mut key = 0;
                             {
                                 let mut guard = ab.lock().unwrap();
-                                key = guard.insert(audio_buffer);
-                                guard.select_buffer(key);
+                                let _ = guard.insert(key, audio_buffer);
                             }
 
-                            cursor.swap(0, Relaxed); // Reset the cursor on every file load after the audio buffer is ready
-
-                            // Immediately start filling the buffer
                             thread::spawn(move || {
-                                while let Some(sample) = mp3_decoder.next() {
-                                    {
-                                        let mut guard = ab.lock().unwrap();
-                                        guard.append_sample(key, sample);
+                                let raw_samples = mp3_decoder.collect::<Vec<i16>>();
+
+                                // do resampling
+                                let mut left = vec![];
+                                let mut right = vec![];
+                                for (idx, sample) in raw_samples.iter().enumerate() {
+                                    if idx % 2 == 0 {
+                                        left.push(*sample as f32);
+                                    } else {
+                                        right.push(*sample as f32);
                                     }
                                 }
+
+                                assert!(left.len() == right.len());
+
+                                let params = InterpolationParameters {
+                                    sinc_len: 256,
+                                    f_cutoff: 0.95,
+                                    interpolation: InterpolationType::Linear,
+                                    oversampling_factor: 256,
+                                    window: WindowFunction::BlackmanHarris2,
+                                };
+
+                                let mut resampler = SincFixedIn::<f32>::new(
+                                    48_000 as f64 / 44_100 as f64, // should be using config_sample_rate / the mp3's sample_rate
+                                    2.0,
+                                    params,
+                                    left.len(),
+                                    2,
+                                )
+                                .unwrap();
+
+                                let channels = vec![left, right];
+
+                                let resampled_audio = resampler
+                                    .process(&channels, None)
+                                    .expect("failed to resample audio");
+
+                                let zip_audio = resampled_audio[0]
+                                    .iter()
+                                    .zip(&resampled_audio[1])
+                                    .collect::<Vec<(&f32, &f32)>>();
+                                    //.flat_map(|z| vec![*z.0 as i16, *z.1 as i16])
+                                    //.collect::<Vec<i16>>();
+
+                                let mut vec_channels = vec![];
+                                for z in zip_audio {
+                                    vec_channels.push(vec![*z.0, *z.1]);
+                                }
+
+                                let flat_channels = vec_channels
+                                    .iter()
+                                    .flatten()
+                                    .map(|s| *s as i16)
+                                    .collect::<Vec<i16>>();
+                                                                    
+                                // append resampled data to audio bank buffer
+                                {
+                                    let mut guard = ab.lock().unwrap();
+                                    guard.append_samples(key, flat_channels);
+                                }
+
+                                tracing::info!("Done loading file and resampling");
                             });
-                            /*
-
-                                    let buf = std::io::BufReader::new(
-                                        File::open(&path).expect("couldn't open file"),
-                                    );
-                                    let mp3_decoder = Mp3Decoder::new(buf)
-                                        .expect("Failed to create mp3 decoder from file buffer");
-                                    let all_mp3_samples_f64 =
-                                        mp3_decoder.map(|s| s as f64).collect::<Vec<f64>>();
-                                    /*
-                                    let all_mp3_samples = mp3_decoder.map(|s| s as i16).collect::<Vec<i16>>();
-                                    let sample_count = all_mp3_samples.len() as f32 / 2.0f32;
-                                    let track_length_in_seconds = sample_count / desired_sample_rate as f32;
-                                    */
-                                    //let mut samples_iter = all_mp3_samples.into_iter();
-
-                                    // Resample Audio
-                                    let mut left = vec![];
-                                    let mut right = vec![];
-                                    for (idx, sample) in all_mp3_samples_f64.iter().enumerate() {
-                                        if idx % 2 == 0 {
-                                            left.push(*sample);
-                                        } else {
-                                            right.push(*sample);
-                                        }
-                                    }
-
-                                    assert!(left.len() == right.len());
-                                    tracing::info!("About to resample");
-                                    let params = InterpolationParameters {
-                                        sinc_len: 256,
-                                        f_cutoff: 0.95,
-                                        interpolation: InterpolationType::Linear,
-                                        oversampling_factor: 256,
-                                        window: WindowFunction::BlackmanHarris2,
-                                    };
-
-                                    let mut resampler = SincFixedIn::<f64>::new(
-                                        48_000 as f64 / desired_sample_rate as f64, // should be using config_sample_rate / the mp3's sample_rate
-                                        2.0,
-                                        params,
-                                        left.len(),
-                                        2,
-                                    )
-                                    .unwrap();
-
-                                    let channels = vec![left, right];
-                                    let resampled_audio = resampler
-                                        .process(&channels, None)
-                                        .expect("failed to resample audio");
-                                    tracing::info!("Finished resampling");
-
-                                    let zip_audio = resampled_audio[0]
-                                        .iter()
-                                        .zip(&resampled_audio[1])
-                                        .collect::<Vec<(&f64, &f64)>>();
-
-                                    let mut vec_channels = vec![];
-                                    for z in zip_audio {
-                                        vec_channels.push(vec![*z.0, *z.1]);
-                                    }
-
-                                    let flat_channels = vec_channels
-                                        .iter()
-                                        .flatten()
-                                        .map(|s| *s as i16)
-                                        .collect::<Vec<i16>>();
-                                    //.into_iter();
-
-                                    // I think it makes sense to assert that the buffer len is evenly
-                                    // divisible by the audio channel count before going forward.
-                                    // Right now I could care less...
-                                    let sample_count_resampled = *(&flat_channels.len()) as f32 / 2.0f32;
-                                    let track_length_in_seconds_resampled =
-                                        (sample_count_resampled as f32 / desired_sample_rate as f32) as i32;
-                                    tracing::info!("resampled: sample_rate: {desired_sample_rate},\
-                                                sample_count: {sample_count_resampled}, \
-                                                track_length_in_seconds: {track_length_in_seconds_resampled}");
-                            */
                         }
                         _ => tracing::info!("Unhandled case in audio command loop"),
                     }

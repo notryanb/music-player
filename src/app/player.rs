@@ -26,6 +26,16 @@ impl Player {
         }
     }
 
+    pub fn select_track(&mut self, track: Option<LibraryItem>) {
+        self.selected_track = track; 
+
+        if let Some(track) = &self.selected_track {
+            self.audio_tx
+                .send(AudioCommand::Select(track.key()))
+                .expect("Failed to send select to audio thread");
+        }
+    }
+
     pub fn is_stopped(&self) -> bool {
         match self.track_state {
             TrackState::Stopped => true,
@@ -48,7 +58,6 @@ impl Player {
                 self.audio_tx
                     .send(AudioCommand::Stop)
                     .expect("Failed to send stop to audio thread");
-                //self.sink.stop();
             }
             _ => (),
         }
@@ -56,14 +65,14 @@ impl Player {
 
     // TODO: Should return Result
     pub fn play(&mut self) {
-        if let Some(selected_track) = &self.selected_track {
+        if let Some(_selected_track) = &self.selected_track {
             match self.track_state {
                 TrackState::Unstarted | TrackState::Stopped | TrackState::Playing => {
                     self.track_state = TrackState::Playing;
-                    let track_path = selected_track.path();
+
                     self.audio_tx
-                        .send(AudioCommand::LoadFile(track_path))
-                        .expect("Failed to send to audio thread");
+                        .send(AudioCommand::Play)
+                        .expect("Failed to send play to audio thread");
                 }
                 TrackState::Paused => {
                     self.track_state = TrackState::Playing;
