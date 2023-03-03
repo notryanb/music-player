@@ -105,6 +105,7 @@ where
     decoder: Decoder<R>,
     current_frame: Frame,
     current_frame_offset: usize,
+    sample_rate: u32,
 }
 
 impl<R> Mp3Decoder<R>
@@ -117,10 +118,13 @@ where
             .next_frame()
             .map_err(|_| ())
             .expect("Couldn't get next frame?");
+        let sample_rate = current_frame.sample_rate as u32;
+
         Ok(Self {
             decoder: decoder,
             current_frame: current_frame,
             current_frame_offset: 0,
+            sample_rate,
         })
     }
 }
@@ -161,6 +165,7 @@ fn write_sample<T: cpal::Sample>(data: &mut [T], next_sample: &mut dyn FnMut() -
 }
 
 pub enum PlayerState {
+    Unstarted,
     Stopped,
     Playing,
     Paused,
@@ -197,18 +202,16 @@ fn main() {
             |err| tracing::error!("an error occurred in the output audio stream {}", err);
         let sample_format = supported_config.sample_format();
         let config: cpal::StreamConfig = supported_config.into();
-        let config_sample_rate = config.sample_rate.0 as f32;
-        let desired_sample_rate = 44_100;
-        tracing::info!("config sample rate: {config_sample_rate}");
+        let device_sample_rate = config.sample_rate.0 as u32;
+        let current_track_sample_rate = Arc::new(Mutex::new(0u32));
+        tracing::info!("config sample rate: {device_sample_rate}");
 
-        let current_track_sample_rate = desired_sample_rate;
         let audio_buffers = Arc::new(Mutex::new(AudioBank::new()));
         let state = Arc::new(Mutex::new(PlayerState::Stopped));
 
         let c1 = cursor.clone();
         let s1 = state.clone();
         let ab = audio_buffers.clone();
-        //let abk = audio_buffers_key.clone();
 
         let mut next_sample = move || {
             let state_guard = s1.lock().unwrap();
@@ -255,18 +258,14 @@ fn main() {
         // Easiest way to do this is save the stream in a higher scope's state.
         let _ = &output_stream.play().unwrap();
 
-        {
-            let mut state_guard = state.lock().unwrap();
-            *state_guard = PlayerState::Playing;
-        }
-
-        // Audio processing loop
         loop {
             match audio_rx.try_recv() {
                 Ok(cmd) => {
                     match cmd {
                         AudioCommand::Seek(seconds) => {
-                            let sample_num = current_track_sample_rate * seconds as u32;
+                            let guard = current_track_sample_rate.lock().unwrap();
+                            let sample_num = *guard * seconds as u32;
+                            drop(guard);
                             cursor.swap(sample_num, Relaxed);
                         }
                         AudioCommand::Stop => {
@@ -297,9 +296,6 @@ fn main() {
 
                             cursor.swap(0, Relaxed); // Reset the cursor on every file load after the audio buffer is ready
                         }
-                        // This shouldn't affect the player state at all.
-                        // It only happens when a file is supposed to be loaded...
-                        // ideally from adding it to a playlist
                         AudioCommand::LoadFile(path, key) => {
                             tracing::info!("Loading a file - {}", &path.display());
 
@@ -312,16 +308,6 @@ fn main() {
 
                             let audio_buffer = AudioBuffer::new();
 
-                            // I think it makes sense to generate key + file on the gui side and
-                            // pass that in. Otherwise I think everytime this gets called, the same
-                            // track will get a new buffer, but we want the existing one.
-                            // TODO: - I think it is worth exploring creating audio buffers when
-                            // tracks are added to a playlist, not when they're selected. This way
-                            // the entire playlist is loaded into memory and the currently playing
-                            // buffer is less likely to be starved. When a track is loaded into the
-                            // playlist. Think about who creates the key... the AudioBank or the
-                            // Player.
-
                             // TODO: Create debug windows that show buffer stats with progress
                             // bars?
                             {
@@ -329,70 +315,80 @@ fn main() {
                                 let _ = guard.insert(key, audio_buffer);
                             }
 
+                            let current_track_sample_rate = current_track_sample_rate.clone();
                             thread::spawn(move || {
-                                let raw_samples = mp3_decoder.collect::<Vec<i16>>();
+                                let sample_rate = *(&mp3_decoder.sample_rate);
 
-                                // do resampling
-                                let mut left = vec![];
-                                let mut right = vec![];
-                                for (idx, sample) in raw_samples.iter().enumerate() {
-                                    if idx % 2 == 0 {
-                                        left.push(*sample as f32);
-                                    } else {
-                                        right.push(*sample as f32);
+                                {
+                                    let mut guard = current_track_sample_rate.lock().unwrap();
+                                    *guard = sample_rate; 
+                                }
+
+                                let mut the_samples = mp3_decoder.collect::<Vec<i16>>();
+
+                                if sample_rate != device_sample_rate {
+                                    tracing::info!("Resampling from {sample_rate} to {device_sample_rate}");
+                                    let mut left = vec![];
+                                    let mut right = vec![];
+                                    for (idx, sample) in the_samples.iter().enumerate() {
+                                        if idx % 2 == 0 {
+                                            left.push(*sample as f32);
+                                        } else {
+                                            right.push(*sample as f32);
+                                        }
                                     }
-                                }
 
-                                assert!(left.len() == right.len());
+                                    assert!(left.len() == right.len());
 
-                                let params = InterpolationParameters {
-                                    sinc_len: 256,
-                                    f_cutoff: 0.95,
-                                    interpolation: InterpolationType::Linear,
-                                    oversampling_factor: 256,
-                                    window: WindowFunction::BlackmanHarris2,
-                                };
+                                    let params = InterpolationParameters {
+                                        sinc_len: 256,
+                                        f_cutoff: 0.95,
+                                        interpolation: InterpolationType::Linear,
+                                        oversampling_factor: 256,
+                                        window: WindowFunction::BlackmanHarris2,
+                                    };
 
-                                let mut resampler = SincFixedIn::<f32>::new(
-                                    48_000 as f64 / 44_100 as f64, // should be using config_sample_rate / the mp3's sample_rate
-                                    2.0,
-                                    params,
-                                    left.len(),
-                                    2,
-                                )
-                                .unwrap();
+                                    let mut resampler = SincFixedIn::<f32>::new(
+                                        48_000 as f64 / 44_100 as f64, // should be using config_sample_rate / the mp3's sample_rate
+                                        2.0,
+                                        params,
+                                        left.len(),
+                                        2,
+                                    )
+                                    .unwrap();
 
-                                let channels = vec![left, right];
+                                    let channels = vec![left, right];
 
-                                let resampled_audio = resampler
-                                    .process(&channels, None)
-                                    .expect("failed to resample audio");
+                                    let resampled_audio = resampler
+                                        .process(&channels, None)
+                                        .expect("failed to resample audio");
 
-                                let zip_audio = resampled_audio[0]
-                                    .iter()
-                                    .zip(&resampled_audio[1])
-                                    .collect::<Vec<(&f32, &f32)>>();
-                                    //.flat_map(|z| vec![*z.0 as i16, *z.1 as i16])
-                                    //.collect::<Vec<i16>>();
+                                    let zip_audio = resampled_audio[0]
+                                        .iter()
+                                        .zip(&resampled_audio[1])
+                                        .collect::<Vec<(&f32, &f32)>>();
+                                        //.flat_map(|z| vec![*z.0 as i16, *z.1 as i16])
+                                        //.collect::<Vec<i16>>();
 
-                                let mut vec_channels = vec![];
-                                for z in zip_audio {
-                                    vec_channels.push(vec![*z.0, *z.1]);
-                                }
+                                    let mut vec_channels = vec![];
+                                    for z in zip_audio {
+                                        vec_channels.push(vec![*z.0, *z.1]);
+                                    }
 
-                                let flat_channels = vec_channels
-                                    .iter()
-                                    .flatten()
-                                    .map(|s| *s as i16)
-                                    .collect::<Vec<i16>>();
-                                                                    
+                                    the_samples = vec_channels
+                                        .iter()
+                                        .flatten()
+                                        .map(|s| *s as i16)
+                                        .collect::<Vec<i16>>();
+                                } else { tracing::info!("no resampling needed"); }
+
                                 // append resampled data to audio bank buffer
                                 {
                                     let mut guard = ab.lock().unwrap();
-                                    guard.append_samples(key, flat_channels);
+                                    guard.append_samples(key, the_samples);
                                 }
 
-                                tracing::info!("Done loading file and resampling");
+                                tracing::info!("Done loading file");
                             });
                         }
                         _ => tracing::info!("Unhandled case in audio command loop"),
