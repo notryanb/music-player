@@ -29,9 +29,8 @@ impl Playlist {
 
     pub fn add(&mut self, track: LibraryItem, audio_cmd_tx: &Sender<AudioCommand>) {
         let track_path = &track.path().clone();
-        let key = &track.key();
         audio_cmd_tx
-            .send(AudioCommand::LoadFile((*track_path.clone()).to_path_buf(), *key))
+            .send(AudioCommand::LoadFile((*track_path.clone()).to_path_buf()))
             .expect("Failed to send to audio thread");
 
         self.tracks.push(track);
@@ -52,9 +51,9 @@ impl Playlist {
     pub fn select(&mut self, idx: usize, audio_cmd_tx: &Sender<AudioCommand>) {
         tracing::info!("SELECTED");
         let track = self.tracks[idx].clone();
-        let key = &track.key();
+        let path = &track.path();
         audio_cmd_tx
-            .send(AudioCommand::Select(*key))
+            .send(AudioCommand::LoadFile((*path).clone()))
             .expect("Failed to send to audio thread");
 
         self.selected = Some(track);

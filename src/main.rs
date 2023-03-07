@@ -6,8 +6,8 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::SampleFormat;
 use eframe::egui;
 use minimp3::{Decoder, Frame};
+use ringbuf::{HeapRb};
 use rubato::Resampler;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
 use std::sync::atomic::{AtomicU32, Ordering::*};
@@ -18,84 +18,54 @@ use std::thread;
 
 mod app;
 
-pub struct AudioBank {
-    pub buffers: HashMap<usize, AudioBuffer>,
-    pub count: usize, // This can be replaced if we randomize the key for the map
-    pub currently_playing_buffer: usize, // TODO: Turn the datatype into some sort of key which can be used in the hashmap
-}
+const RB_SIZE: usize = 48000 * 2;
 
-impl AudioBank {
-    pub fn new() -> Self {
-        Self {
-            buffers: HashMap::new(),
-            count: 0,
-            currently_playing_buffer: 0,
-        }
-    }
-
-    pub fn insert(&mut self, key: usize, buffer: AudioBuffer) {
-        self.buffers.insert(key, buffer);
-    }
-
-
-    // TODO - probably want to lock the buffer for writes by whatever is using this.
-    // I think reading while locked for writing is okay...?
-    pub fn append_sample(&mut self, key: usize, sample: i16) {
-        if let Some(buffer) = self.buffers.get_mut(&key) {
-            buffer.append_sample(sample);
-        }
-    }
-
-    pub fn append_samples(&mut self, key: usize, samples: Vec<i16>) {
-        if let Some(buffer) = self.buffers.get_mut(&key) {
-            // TODO: probably want to make this one append all instead of individual calls
-            for sample in samples {
-                buffer.append_sample(sample);
-            }
-        }
-    }
-
-    pub fn get_sample(&self, sample_idx: usize) -> i16 {
-        if let Some(buffer) = self.buffers.get(&self.currently_playing_buffer) {
-            buffer.get_sample(sample_idx)
-        } else {
-            0i16
-        }
-    }
-
-    pub fn select_buffer(&mut self, key: usize) {
-        if self.buffers.get(&key).is_some() {
-            self.currently_playing_buffer = key;
-        }
-    }
-}
-
+/*
+// TODO - If this works, maybe I should be using the RingBuf directly?
 pub struct AudioBuffer {
-    pub data: Vec<i16>,
-    pub samples_len: usize, // This should be updated by the Mp3Decoder when it is done processing
-                            // samples
+    audio_producer: Producer<i16, Arc<HeapRb<i16>>>,
+    audio_consumer: Consumer<i16, Arc<HeapRb<i16>>>,
 }
 
 impl AudioBuffer {
     pub fn new() -> Self {
+        let (audio_producer, audio_consumer) = HeapRb::<i16>::new(RB_SIZE).split();
         Self {
-            data: vec![0; 1024],
-            samples_len: 0,
+           audio_producer,
+           audio_consumer,
         }
     }
 
     // Think about returning an Option....
     pub fn get_sample(&self, idx: usize) -> i16 {
+        match self.audio_consumer.pop() {
+            Some(data) => data,
+            None => 0i16,
+        }
+        /*
         if idx > &self.data.len() - 1 {
             return 0;
         }
         self.data[idx]
+        */
     }
 
     pub fn append_sample(&mut self, sample: i16) {
-        self.data.push(sample);
+        self.audio_producer.push(sample).map_err(|_| ());
+        //self.data.push(sample);
     }
+
+    pub fn can_accept_samples(&self) -> bool {
+        self.audio_producer.free_len() > 0
+    }
+
+    /*
+    pub fn set_buffer(&mut self, new_audio_buffer: Vec<i16>) {
+        //self.data = new_audio_buffer
+    }
+    */
 }
+*/
 
 pub struct Mp3Decoder<R>
 where
@@ -193,6 +163,15 @@ fn write_sample<T: cpal::Sample>(data: &mut [T], next_sample: &mut dyn FnMut() -
     }
 }
 
+/*
+fn write_samples<T: cpal::Sample>(data: &mut [T], next_sample_chunk: &mut dyn FnMut() -> &[i16]) {
+    for frame in data.chunks_mut(1024) {
+        let values = next_sample_chunk().map(|sample| cpal::Sample::from::<i16>(sample)).collect();
+        frame = values;
+    }
+}
+*/
+
 pub enum PlayerState {
     Unstarted,
     Stopped,
@@ -235,21 +214,18 @@ fn main() {
         let current_track_sample_rate = Arc::new(Mutex::new(0u32));
         tracing::info!("config sample rate: {device_sample_rate}");
 
-        let audio_buffers = Arc::new(Mutex::new(AudioBank::new()));
         let state = Arc::new(Mutex::new(PlayerState::Stopped));
 
-        let c1 = cursor.clone();
-        let s1 = state.clone();
-        let ab = audio_buffers.clone();
+        let state_clone = state.clone();
+        let (mut audio_producer, mut audio_consumer) = HeapRb::<i16>::new(RB_SIZE).split();
 
         let mut next_sample = move || {
-            let state_guard = s1.lock().unwrap();
+            let state_guard = state_clone.lock().unwrap();
             match *state_guard {
                 PlayerState::Playing => {
-                    let c = c1.fetch_add(1, Relaxed);
-                    {
-                        let guard = ab.lock().unwrap();
-                        guard.get_sample(c as usize)
+                    match audio_consumer.pop() {
+                        Some(data) => data,
+                        None => 0i16,
                     }
                 }
                 _ => 0i16,
@@ -287,65 +263,133 @@ fn main() {
         // Easiest way to do this is save the stream in a higher scope's state.
         let _ = &output_stream.play().unwrap();
 
+        let mut audio_source: Option<Vec<i16>> = None;
+
         loop {
-            match audio_rx.try_recv() {
-                Ok(cmd) => {
-                    match cmd {
-                        AudioCommand::Seek(seconds) => {
-                            let guard = current_track_sample_rate.lock().unwrap();
-                            let sample_num = *guard * seconds as u32;
-                            drop(guard);
-                            cursor.swap(sample_num, Relaxed);
-                        }
-                        AudioCommand::Stop => {
-                            tracing::info!("Processing STOP command");
-                            {
-                                let mut state_guard = state.lock().unwrap();
-                                *state_guard = PlayerState::Stopped;
+
+            if let Some(mut audio_source1) = audio_source {
+                let mut audio_source_iter = audio_source1.into_iter();
+
+                loop {
+                    let written = audio_producer.push_iter(&mut audio_source_iter);
+                    tracing::info!("written: {written}");
+
+                    thread::sleep(std::time::Duration::from_millis(500));
+
+                    match audio_rx.try_recv() {
+                        Ok(cmd) => {
+                            match cmd {
+                                AudioCommand::Seek(seconds) => {
+                                    let guard = current_track_sample_rate.lock().unwrap();
+                                    let sample_num = *guard * seconds as u32;
+                                    drop(guard);
+                                    cursor.swap(sample_num, Relaxed);
+                                }
+                                AudioCommand::Stop => {
+                                    tracing::info!("Processing STOP command");
+                                    {
+                                        let mut state_guard = state.lock().unwrap();
+                                        *state_guard = PlayerState::Stopped;
+                                    }
+                                    tracing::info!("Processed STOP command");
+                                }
+                                AudioCommand::Pause => {
+                                    tracing::info!("Processing PAUSE command");
+                                    let mut state_guard = state.lock().unwrap();
+                                    *state_guard = PlayerState::Paused;
+                                }
+                                AudioCommand::Play => {
+                                    tracing::info!("Processing PLAY command");
+                                    let mut state_guard = state.lock().unwrap();
+                                    *state_guard = PlayerState::Playing;
+                                }
+                                AudioCommand::LoadFile(path) => {
+                                    tracing::info!("Loading a file - {}", &path.display());
+
+                                    let buf = std::io::BufReader::new(
+                                        File::open(&path).expect("couldn't open file"),
+                                    );
+                                    let mp3_decoder = Mp3Decoder::new(buf)
+                                        .expect("Failed to create mp3 decoder from file buffer");
+
+                                    let current_track_sample_rate = current_track_sample_rate.clone();
+                                    let sample_rate = *(&mp3_decoder.sample_rate);
+
+                                    {
+                                        let mut guard = current_track_sample_rate.lock().unwrap();
+                                        *guard = sample_rate; 
+                                    }
+
+                                    let start = std::time::Instant::now();
+                                    let raw_samples = mp3_decoder
+                                        .flat_map(|sample| (sample as f32).to_le_bytes())
+                                        .collect::<Vec<u8>>();
+
+                                    let mut input_cursor = std::io::Cursor::new(&raw_samples);
+                                    let capacity = (*(&raw_samples.len()) as f32 * (device_sample_rate as f32 / sample_rate as f32)) as usize;
+                                    let mut output_buffer = Vec::with_capacity(capacity);
+                                    let mut output_cursor = std::io::Cursor::new(&mut output_buffer);
+                                    let channels = 2;
+                                    let chunk_size = 1024;
+                                    let sub_chunks = 2;
+
+                                    let mut fft_resampler = rubato::FftFixedIn::<f32>::new(
+                                        sample_rate as usize,
+                                        device_sample_rate as usize,
+                                        chunk_size,
+                                        sub_chunks,
+                                        channels
+                                    ).unwrap();
+
+                                    let num_frames_per_channel = fft_resampler.input_frames_next();
+                                    let sample_byte_size = 8;
+                                    let num_chunks = &raw_samples.len() / (sample_byte_size * channels * num_frames_per_channel);
+
+                                    for _chunk in 0..num_chunks {
+                                        let frame_data = read_frames(&mut input_cursor, num_frames_per_channel, channels);
+                                        let output = fft_resampler.process(&frame_data, None).unwrap();
+                                        write_frames(output, &mut output_cursor, channels);
+                                    }
+
+
+                                    let resampled_audio = output_buffer
+                                        .iter()
+                                        .as_slice()
+                                        .chunks(4)
+                                        .map(|chunk| {
+                                            (f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])) as i16
+                                        })
+                                        //.into_iter();
+                                        .collect::<Vec<i16>>();
+
+                                    let end = start.elapsed();
+                                    tracing::info!("Done resampling file: {:?}ms", end);
+                                    tracing::info!("Done loading all samples");
+
+                                    audio_source = Some(resampled_audio);
+                                    break;
+                                }
+                                _ => tracing::warn!("Unhandled case in audio command loop"),
                             }
-                            cursor.swap(0, Relaxed);
                         }
-                        AudioCommand::Pause => {
-                            tracing::info!("Processing PAUSE command");
-                            let mut state_guard = state.lock().unwrap();
-                            *state_guard = PlayerState::Paused;
-                        }
-                        AudioCommand::Play => {
-                            tracing::info!("Processing PLAY command");
-                            let mut state_guard = state.lock().unwrap();
-                            *state_guard = PlayerState::Playing;
-                        }
-                        AudioCommand::Select(key) => {
-                            tracing::info!("Processing SELECT {}", &key);
-                            let ab = audio_buffers.clone();
-                            {
-                                let mut guard = ab.lock().unwrap();
-                                guard.select_buffer(key);
-                            }
+                        Err(_) => (), // When no commands are sent, this will evaluate. aka - it is the
+                                    // common case. No need to print anything
+                    }
+                }
+            } else {
+                match audio_rx.try_recv() {
+                    Ok(cmd) => {
+                        match cmd {
+                            AudioCommand::LoadFile(path) => {
+                                tracing::info!("Loading a file - {}", &path.display());
 
-                            cursor.swap(0, Relaxed); // Reset the cursor on every file load after the audio buffer is ready
-                        }
-                        AudioCommand::LoadFile(path, key) => {
-                            tracing::info!("Loading a file - {}", &path.display());
+                                let buf = std::io::BufReader::new(
+                                    File::open(&path).expect("couldn't open file"),
+                                );
+                                let mp3_decoder = Mp3Decoder::new(buf)
+                                    .expect("Failed to create mp3 decoder from file buffer");
 
-                            let ab = audio_buffers.clone();
-                            let buf = std::io::BufReader::new(
-                                File::open(&path).expect("couldn't open file"),
-                            );
-                            let mp3_decoder = Mp3Decoder::new(buf)
-                                .expect("Failed to create mp3 decoder from file buffer");
-
-                            let audio_buffer = AudioBuffer::new();
-
-                            // TODO: Create debug windows that show buffer stats with progress
-                            // bars?
-                            {
-                                let mut guard = ab.lock().unwrap();
-                                let _ = guard.insert(key, audio_buffer);
-                            }
-
-                            let current_track_sample_rate = current_track_sample_rate.clone();
-                            thread::spawn(move || {
+                                let current_track_sample_rate = current_track_sample_rate.clone();
                                 let sample_rate = *(&mp3_decoder.sample_rate);
 
                                 {
@@ -367,8 +411,8 @@ fn main() {
                                 let sub_chunks = 2;
 
                                 let mut fft_resampler = rubato::FftFixedIn::<f32>::new(
-                                    44100 as usize,
-                                    48000 as usize,
+                                    sample_rate as usize,
+                                    device_sample_rate as usize,
                                     chunk_size,
                                     sub_chunks,
                                     channels
@@ -384,26 +428,28 @@ fn main() {
                                     write_frames(output, &mut output_cursor, channels);
                                 }
 
+                                let resampled_audio = output_buffer
+                                    .iter()
+                                    .as_slice()
+                                    .chunks(4)
+                                    .map(|chunk| {
+                                        (f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])) as i16
+                                    })
+                                    //.into_iter();
+                                    .collect::<Vec<i16>>();
+
                                 let end = start.elapsed();
                                 tracing::info!("Done resampling file: {:?}ms", end);
 
-
-                                for bytes in output_buffer.iter().as_slice().chunks(4) {
-                                    let sample = (f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])) as i16;
-                                    {
-                                        let mut guard = ab.lock().unwrap();
-                                        guard.append_sample(key, sample);
-                                    }
-                                }
-
-                                tracing::info!("Done loading file");
-                            });
+                                audio_source = Some(resampled_audio);
+                                tracing::info!("Done loading all samples");
+                            }
+                            _ => tracing::warn!("Unhandled case in audio command loop"),
                         }
-                        _ => tracing::info!("Unhandled case in audio command loop"),
                     }
+                    Err(_) => (), // When no commands are sent, this will evaluate. aka - it is the
+                                // common case. No need to print anything
                 }
-                Err(_) => (), // When no commands are sent, this will evaluate. aka - it is the
-                              // common case. No need to print anything
             }
         }
     });

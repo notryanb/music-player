@@ -31,7 +31,7 @@ impl Player {
 
         if let Some(track) = &self.selected_track {
             self.audio_tx
-                .send(AudioCommand::Select(track.key()))
+                .send(AudioCommand::LoadFile(track.path()))
                 .expect("Failed to send select to audio thread");
         }
     }
@@ -108,7 +108,7 @@ impl Player {
             if let Some(current_track_position) = playlist.get_pos(&selected_track) {
                 if current_track_position > 0 {
                     let previous_track = &playlist.tracks[current_track_position - 1];
-                    self.selected_track = Some(previous_track.clone());
+                    self.select_track(Some((*previous_track).clone()));
                     self.play();
                 }
             }
@@ -120,7 +120,7 @@ impl Player {
             if let Some(current_track_position) = playlist.get_pos(&selected_track) {
                 if current_track_position < playlist.tracks.len() - 1 {
                     let next_track = &playlist.tracks[current_track_position + 1];
-                    self.selected_track = Some(next_track.clone());
+                    self.select_track(Some((*next_track).clone()));
                     self.play();
                 }
             }
