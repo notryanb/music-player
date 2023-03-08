@@ -52,7 +52,11 @@ impl AppComponent for PlaylistTable {
                         // Temporary hack because I don't yet know how to treat an entire Row
                         // as a response
                         if artist_label.double_clicked() {
-                            ctx.player.as_mut().unwrap().selected_track = Some(track.clone());
+                            //ctx.player.as_mut().unwrap().selected_track = Some(track.clone());
+                            ctx.player
+                                .as_mut()
+                                .unwrap()
+                                .select_track(Some(track.clone()));
                             ctx.player.as_mut().unwrap().play();
                         }
 

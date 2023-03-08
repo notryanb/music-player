@@ -26,6 +26,16 @@ impl Player {
         }
     }
 
+    pub fn select_track(&mut self, track: Option<LibraryItem>) {
+        self.selected_track = track;
+
+        if let Some(track) = &self.selected_track {
+            self.audio_tx
+                .send(AudioCommand::LoadFile(track.path()))
+                .expect("Failed to send select to audio thread");
+        }
+    }
+
     pub fn is_stopped(&self) -> bool {
         match self.track_state {
             TrackState::Stopped => true,
@@ -48,7 +58,6 @@ impl Player {
                 self.audio_tx
                     .send(AudioCommand::Stop)
                     .expect("Failed to send stop to audio thread");
-                //self.sink.stop();
             }
             _ => (),
         }
@@ -56,40 +65,20 @@ impl Player {
 
     // TODO: Should return Result
     pub fn play(&mut self) {
-        if let Some(selected_track) = &self.selected_track {
-            /*
-            let file = std::io::BufReader::new(
-                std::fs::File::open(&selected_track.path()).expect("Failed to open file"),
-            );
-            */
-            //let source = rodio::Decoder::new(file).expect("Failed to decode audio file");
-
+        if let Some(_selected_track) = &self.selected_track {
             match self.track_state {
                 TrackState::Unstarted | TrackState::Stopped | TrackState::Playing => {
                     self.track_state = TrackState::Playing;
-                    let track_path = selected_track.path();
+
                     self.audio_tx
-                        .send(AudioCommand::LoadFile(track_path))
-                        .expect("Failed to send to audio thread");
-
-                    /*
-                    let sink_try = rodio::Sink::try_new(&self.stream_handle);
-
-                    match sink_try {
-                        Ok(sink) => {
-                            self.sink = sink;
-                            self.sink.append(source);
-                        }
-                        Err(e) => tracing::error!("{:?}", e),
-                    }
-                    */
+                        .send(AudioCommand::Play)
+                        .expect("Failed to send play to audio thread");
                 }
                 TrackState::Paused => {
                     self.track_state = TrackState::Playing;
                     self.audio_tx
                         .send(AudioCommand::Play)
                         .expect("Failed to send play to audio thread");
-                    //self.sink.play();
                 }
             }
         }
@@ -103,14 +92,12 @@ impl Player {
                 self.audio_tx
                     .send(AudioCommand::Pause)
                     .expect("Failed to send pause to audio thread");
-                //self.sink.pause();
             }
             TrackState::Paused => {
                 self.track_state = TrackState::Playing;
                 self.audio_tx
                     .send(AudioCommand::Play)
                     .expect("Failed to send play to audio thread");
-                //self.sink.play();
             }
             _ => (),
         }
@@ -121,7 +108,7 @@ impl Player {
             if let Some(current_track_position) = playlist.get_pos(&selected_track) {
                 if current_track_position > 0 {
                     let previous_track = &playlist.tracks[current_track_position - 1];
-                    self.selected_track = Some(previous_track.clone());
+                    self.select_track(Some((*previous_track).clone()));
                     self.play();
                 }
             }
@@ -133,7 +120,7 @@ impl Player {
             if let Some(current_track_position) = playlist.get_pos(&selected_track) {
                 if current_track_position < playlist.tracks.len() - 1 {
                     let next_track = &playlist.tracks[current_track_position + 1];
-                    self.selected_track = Some(next_track.clone());
+                    self.select_track(Some((*next_track).clone()));
                     self.play();
                 }
             }

@@ -50,10 +50,12 @@ pub struct LibraryItem {
     year: Option<i32>,
     genre: Option<String>,
     track_number: Option<u32>,
+    key: usize,
 }
 
 impl LibraryItem {
     pub fn new(path: PathBuf) -> Self {
+        use rand::Rng;
         Self {
             path,
             title: None,
@@ -62,11 +64,16 @@ impl LibraryItem {
             year: None,
             genre: None,
             track_number: None,
+            key: rand::thread_rng().gen(),
         }
     }
 
     pub fn path(&self) -> PathBuf {
         self.path.clone()
+    }
+
+    pub fn key(&self) -> usize {
+        self.key
     }
 
     pub fn set_title(&mut self, title: Option<&str>) -> Self {

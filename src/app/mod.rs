@@ -16,6 +16,7 @@ pub enum AudioCommand {
     Pause,
     Seek(u32), // Maybe this should represent a duration?
     LoadFile(std::path::PathBuf),
+    Select(usize),
     SetVolume(f32),
 }
 
