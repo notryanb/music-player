@@ -18,7 +18,11 @@ use std::thread;
 
 mod app;
 
-const RB_SIZE: usize = 48000 * 1;
+// The ring buffer should be 1 sec of device audio
+// However, this will be different on each system.
+// The device sample rate should be passed into to ring buffer
+// creation instead of using a const.
+const RB_SIZE: usize = 48000;
 
 pub struct Mp3Decoder<R>
 where
@@ -169,7 +173,7 @@ fn load_file(path: PathBuf, device_sample_rate: u32) -> Vec<i16> {
         .collect::<Vec<i16>>();
 
     let end = start.elapsed();
-    tracing::info!("Done resampling file: {:?}ms", end);
+    tracing::info!("Done resampling file: {:?}", end);
     tracing::info!("Done loading all samples");
 
     resampled_audio
@@ -267,16 +271,23 @@ fn main() {
         let mut audio_source: Option<Vec<i16>> = None;
 
         loop {
+            let audio_source_clone = audio_source.clone(); // This makes me sad, but it helps me
+                                                           // implement STOP
             if let Some(audio_source1) = audio_source {
+                // TODO - I really like how easy it is to send a ton of samples into the ring
+                // buffer, but this makes seeking and stopping much harder because the iterator
+                // only moves forward
                 let mut audio_source_iter = audio_source1.into_iter();
 
-                loop {
+                'audio_present: loop {
                     audio_producer.push_iter(&mut audio_source_iter);
 
                     match audio_rx.try_recv() {
                         Ok(cmd) => {
                             match cmd {
                                 AudioCommand::Seek(seconds) => {
+                                    tracing::info!("Processing SEEK command");
+                                    // TODO - Need to figure out how to implement using iterator + ring buf
                                     let guard = current_track_sample_rate.lock().unwrap();
                                     let sample_num = *guard * seconds as u32;
                                     drop(guard);
@@ -288,8 +299,12 @@ fn main() {
                                         let mut state_guard = state.lock().unwrap();
                                         *state_guard = PlayerState::Stopped;
                                     }
-                                    tracing::info!("Processed STOP command");
-                                    //break;
+                                    // TODO - Doing this incurs an extra allocation.
+                                    // Also, when stopping the ring buffer isn't flushed, so when
+                                    // you start to play again there is still data to consume from
+                                    // the previous track
+                                    audio_source = audio_source_clone;
+                                    break 'audio_present;
                                 }
                                 AudioCommand::Pause => {
                                     tracing::info!("Processing PAUSE command");
@@ -304,7 +319,7 @@ fn main() {
                                 AudioCommand::LoadFile(path) => {
                                     let resampled_audio = load_file(path, device_sample_rate);
                                     audio_source = Some(resampled_audio);
-                                    break;
+                                    break 'audio_present;
                                 }
                                 _ => tracing::warn!("Unhandled case in audio command loop"),
                             }
@@ -314,6 +329,9 @@ fn main() {
                     }
                 }
             } else {
+                // When the audio_source is None.
+                // This will only be entered when the app boots and a track has not yet been
+                // selected.
                 match audio_rx.try_recv() {
                     Ok(cmd) => match cmd {
                         AudioCommand::LoadFile(path) => {
