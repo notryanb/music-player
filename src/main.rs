@@ -10,10 +10,10 @@ use ringbuf::HeapRb;
 use rubato::Resampler;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering::*};
 use std::sync::mpsc::channel;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 mod app;
@@ -109,6 +109,70 @@ fn write_sample<T: cpal::Sample>(data: &mut [T], next_sample: &mut dyn FnMut() -
             *sample = value;
         }
     }
+}
+
+// TODO - This should probably be an error
+fn load_file(path: PathBuf, device_sample_rate: u32) -> Vec<i16> {
+    tracing::info!("Loading a file - {}", &path.display());
+
+    let buf = std::io::BufReader::new(File::open(&path).expect("couldn't open file"));
+    let mp3_decoder = Mp3Decoder::new(buf).expect("Failed to create mp3 decoder from file buffer");
+
+    //let current_track_sample_rate = current_track_sample_rate.clone();
+    let sample_rate = *(&mp3_decoder.sample_rate);
+
+    /*
+    {
+        let mut guard = current_track_sample_rate.lock().unwrap();
+        *guard = sample_rate;
+    }
+    */
+
+    let start = std::time::Instant::now();
+    let raw_samples = mp3_decoder
+        .flat_map(|sample| (sample as f32).to_le_bytes())
+        .collect::<Vec<u8>>();
+
+    let mut input_cursor = std::io::Cursor::new(&raw_samples);
+    let capacity =
+        (*(&raw_samples.len()) as f32 * (device_sample_rate as f32 / sample_rate as f32)) as usize;
+    let mut output_buffer = Vec::with_capacity(capacity);
+    let mut output_cursor = std::io::Cursor::new(&mut output_buffer);
+    let channels = 2;
+    let chunk_size = 1024;
+    let sub_chunks = 2;
+
+    let mut fft_resampler = rubato::FftFixedIn::<f32>::new(
+        sample_rate as usize,
+        device_sample_rate as usize,
+        chunk_size,
+        sub_chunks,
+        channels,
+    )
+    .unwrap();
+
+    let num_frames_per_channel = fft_resampler.input_frames_next();
+    let sample_byte_size = 8;
+    let num_chunks = &raw_samples.len() / (sample_byte_size * channels * num_frames_per_channel);
+
+    for _chunk in 0..num_chunks {
+        let frame_data = read_frames(&mut input_cursor, num_frames_per_channel, channels);
+        let output = fft_resampler.process(&frame_data, None).unwrap();
+        write_frames(output, &mut output_cursor, channels);
+    }
+
+    let resampled_audio = output_buffer
+        .iter()
+        .as_slice()
+        .chunks(4)
+        .map(|chunk| (f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])) as i16)
+        .collect::<Vec<i16>>();
+
+    let end = start.elapsed();
+    tracing::info!("Done resampling file: {:?}ms", end);
+    tracing::info!("Done loading all samples");
+
+    resampled_audio
 }
 
 pub enum PlayerState {
@@ -225,6 +289,7 @@ fn main() {
                                         *state_guard = PlayerState::Stopped;
                                     }
                                     tracing::info!("Processed STOP command");
+                                    //break;
                                 }
                                 AudioCommand::Pause => {
                                     tracing::info!("Processing PAUSE command");
@@ -237,80 +302,7 @@ fn main() {
                                     *state_guard = PlayerState::Playing;
                                 }
                                 AudioCommand::LoadFile(path) => {
-                                    tracing::info!("Loading a file - {}", &path.display());
-
-                                    let buf = std::io::BufReader::new(
-                                        File::open(&path).expect("couldn't open file"),
-                                    );
-                                    let mp3_decoder = Mp3Decoder::new(buf)
-                                        .expect("Failed to create mp3 decoder from file buffer");
-
-                                    let current_track_sample_rate =
-                                        current_track_sample_rate.clone();
-                                    let sample_rate = *(&mp3_decoder.sample_rate);
-
-                                    {
-                                        let mut guard = current_track_sample_rate.lock().unwrap();
-                                        *guard = sample_rate;
-                                    }
-
-                                    let start = std::time::Instant::now();
-                                    let raw_samples = mp3_decoder
-                                        .flat_map(|sample| (sample as f32).to_le_bytes())
-                                        .collect::<Vec<u8>>();
-
-                                    let mut input_cursor = std::io::Cursor::new(&raw_samples);
-                                    let capacity = (*(&raw_samples.len()) as f32
-                                        * (device_sample_rate as f32 / sample_rate as f32))
-                                        as usize;
-                                    let mut output_buffer = Vec::with_capacity(capacity);
-                                    let mut output_cursor =
-                                        std::io::Cursor::new(&mut output_buffer);
-                                    let channels = 2;
-                                    let chunk_size = 1024;
-                                    let sub_chunks = 2;
-
-                                    let mut fft_resampler = rubato::FftFixedIn::<f32>::new(
-                                        sample_rate as usize,
-                                        device_sample_rate as usize,
-                                        chunk_size,
-                                        sub_chunks,
-                                        channels,
-                                    )
-                                    .unwrap();
-
-                                    let num_frames_per_channel = fft_resampler.input_frames_next();
-                                    let sample_byte_size = 8;
-                                    let num_chunks = &raw_samples.len()
-                                        / (sample_byte_size * channels * num_frames_per_channel);
-
-                                    for _chunk in 0..num_chunks {
-                                        let frame_data = read_frames(
-                                            &mut input_cursor,
-                                            num_frames_per_channel,
-                                            channels,
-                                        );
-                                        let output =
-                                            fft_resampler.process(&frame_data, None).unwrap();
-                                        write_frames(output, &mut output_cursor, channels);
-                                    }
-
-                                    let resampled_audio = output_buffer
-                                        .iter()
-                                        .as_slice()
-                                        .chunks(4)
-                                        .map(|chunk| {
-                                            (f32::from_le_bytes([
-                                                chunk[0], chunk[1], chunk[2], chunk[3],
-                                            ])) as i16
-                                        })
-                                        //.into_iter();
-                                        .collect::<Vec<i16>>();
-
-                                    let end = start.elapsed();
-                                    tracing::info!("Done resampling file: {:?}ms", end);
-                                    tracing::info!("Done loading all samples");
-
+                                    let resampled_audio = load_file(path, device_sample_rate);
                                     audio_source = Some(resampled_audio);
                                     break;
                                 }
@@ -323,85 +315,14 @@ fn main() {
                 }
             } else {
                 match audio_rx.try_recv() {
-                    Ok(cmd) => {
-                        match cmd {
-                            AudioCommand::LoadFile(path) => {
-                                tracing::info!("Loading a file - {}", &path.display());
-
-                                let buf = std::io::BufReader::new(
-                                    File::open(&path).expect("couldn't open file"),
-                                );
-                                let mp3_decoder = Mp3Decoder::new(buf)
-                                    .expect("Failed to create mp3 decoder from file buffer");
-
-                                let current_track_sample_rate = current_track_sample_rate.clone();
-                                let sample_rate = *(&mp3_decoder.sample_rate);
-
-                                {
-                                    let mut guard = current_track_sample_rate.lock().unwrap();
-                                    *guard = sample_rate;
-                                }
-
-                                let start = std::time::Instant::now();
-                                let raw_samples = mp3_decoder
-                                    .flat_map(|sample| (sample as f32).to_le_bytes())
-                                    .collect::<Vec<u8>>();
-
-                                let mut input_cursor = std::io::Cursor::new(&raw_samples);
-                                let capacity = (*(&raw_samples.len()) as f32
-                                    * (device_sample_rate as f32 / sample_rate as f32))
-                                    as usize;
-                                let mut output_buffer = Vec::with_capacity(capacity);
-                                let mut output_cursor = std::io::Cursor::new(&mut output_buffer);
-                                let channels = 2;
-                                let chunk_size = 1024;
-                                let sub_chunks = 2;
-
-                                let mut fft_resampler = rubato::FftFixedIn::<f32>::new(
-                                    sample_rate as usize,
-                                    device_sample_rate as usize,
-                                    chunk_size,
-                                    sub_chunks,
-                                    channels,
-                                )
-                                .unwrap();
-
-                                let num_frames_per_channel = fft_resampler.input_frames_next();
-                                let sample_byte_size = 8;
-                                let num_chunks = &raw_samples.len()
-                                    / (sample_byte_size * channels * num_frames_per_channel);
-
-                                for _chunk in 0..num_chunks {
-                                    let frame_data = read_frames(
-                                        &mut input_cursor,
-                                        num_frames_per_channel,
-                                        channels,
-                                    );
-                                    let output = fft_resampler.process(&frame_data, None).unwrap();
-                                    write_frames(output, &mut output_cursor, channels);
-                                }
-
-                                let resampled_audio = output_buffer
-                                    .iter()
-                                    .as_slice()
-                                    .chunks(4)
-                                    .map(|chunk| {
-                                        (f32::from_le_bytes([
-                                            chunk[0], chunk[1], chunk[2], chunk[3],
-                                        ])) as i16
-                                    })
-                                    //.into_iter();
-                                    .collect::<Vec<i16>>();
-
-                                let end = start.elapsed();
-                                tracing::info!("Done resampling file: {:?}ms", end);
-
-                                audio_source = Some(resampled_audio);
-                                tracing::info!("Done loading all samples");
-                            }
-                            _ => tracing::warn!("Unhandled case in audio command loop"),
+                    Ok(cmd) => match cmd {
+                        AudioCommand::LoadFile(path) => {
+                            let resampled_audio = load_file(path, device_sample_rate);
+                            audio_source = Some(resampled_audio);
+                            tracing::info!("Done loading all samples");
                         }
-                    }
+                        _ => tracing::warn!("Unhandled case in audio command loop"),
+                    },
                     Err(_) => (), // When no commands are sent, this will evaluate. aka - it is the
                                   // common case. No need to print anything
                 }

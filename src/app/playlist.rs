@@ -27,12 +27,7 @@ impl Playlist {
         self.name.clone()
     }
 
-    pub fn add(&mut self, track: LibraryItem, audio_cmd_tx: &Sender<AudioCommand>) {
-        let track_path = &track.path().clone();
-        audio_cmd_tx
-            .send(AudioCommand::LoadFile((*track_path.clone()).to_path_buf()))
-            .expect("Failed to send to audio thread");
-
+    pub fn add(&mut self, track: LibraryItem) {
         self.tracks.push(track);
     }
 
