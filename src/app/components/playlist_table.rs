@@ -53,7 +53,10 @@ impl AppComponent for PlaylistTable {
                         // as a response
                         if artist_label.double_clicked() {
                             //ctx.player.as_mut().unwrap().selected_track = Some(track.clone());
-                            ctx.player.as_mut().unwrap().select_track(Some(track.clone()));
+                            ctx.player
+                                .as_mut()
+                                .unwrap()
+                                .select_track(Some(track.clone()));
                             ctx.player.as_mut().unwrap().play();
                         }
 

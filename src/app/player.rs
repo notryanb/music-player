@@ -27,7 +27,7 @@ impl Player {
     }
 
     pub fn select_track(&mut self, track: Option<LibraryItem>) {
-        self.selected_track = track; 
+        self.selected_track = track;
 
         if let Some(track) = &self.selected_track {
             self.audio_tx

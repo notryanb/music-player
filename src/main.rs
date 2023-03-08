@@ -6,7 +6,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::SampleFormat;
 use eframe::egui;
 use minimp3::{Decoder, Frame};
-use ringbuf::{HeapRb};
+use ringbuf::HeapRb;
 use rubato::Resampler;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
@@ -18,54 +18,7 @@ use std::thread;
 
 mod app;
 
-const RB_SIZE: usize = 48000 * 2;
-
-/*
-// TODO - If this works, maybe I should be using the RingBuf directly?
-pub struct AudioBuffer {
-    audio_producer: Producer<i16, Arc<HeapRb<i16>>>,
-    audio_consumer: Consumer<i16, Arc<HeapRb<i16>>>,
-}
-
-impl AudioBuffer {
-    pub fn new() -> Self {
-        let (audio_producer, audio_consumer) = HeapRb::<i16>::new(RB_SIZE).split();
-        Self {
-           audio_producer,
-           audio_consumer,
-        }
-    }
-
-    // Think about returning an Option....
-    pub fn get_sample(&self, idx: usize) -> i16 {
-        match self.audio_consumer.pop() {
-            Some(data) => data,
-            None => 0i16,
-        }
-        /*
-        if idx > &self.data.len() - 1 {
-            return 0;
-        }
-        self.data[idx]
-        */
-    }
-
-    pub fn append_sample(&mut self, sample: i16) {
-        self.audio_producer.push(sample).map_err(|_| ());
-        //self.data.push(sample);
-    }
-
-    pub fn can_accept_samples(&self) -> bool {
-        self.audio_producer.free_len() > 0
-    }
-
-    /*
-    pub fn set_buffer(&mut self, new_audio_buffer: Vec<i16>) {
-        //self.data = new_audio_buffer
-    }
-    */
-}
-*/
+const RB_SIZE: usize = 48000 * 1;
 
 pub struct Mp3Decoder<R>
 where
@@ -98,10 +51,6 @@ where
     }
 }
 
-// TODO
-// Instead of decoding the entire buffer up front and then resampling the entire thing,
-// I can decode the next frame of data, resample the frame only. One issue here is I'll be missing
-// out on being able to figure out track length by frames.
 impl<R> Iterator for Mp3Decoder<R>
 where
     R: Read + Seek,
@@ -124,12 +73,11 @@ where
     }
 }
 
-
 fn read_frames<R: Read + Seek>(input_buffer: &mut R, nbr: usize, channels: usize) -> Vec<Vec<f32>> {
     let mut buffer = vec![0u8; 4];
     let mut wfs = Vec::with_capacity(channels);
     for _chan in 0..channels {
-       wfs.push(Vec::with_capacity(nbr)); 
+        wfs.push(Vec::with_capacity(nbr));
     }
     let mut value: f32;
     for _frame in 0..nbr {
@@ -162,15 +110,6 @@ fn write_sample<T: cpal::Sample>(data: &mut [T], next_sample: &mut dyn FnMut() -
         }
     }
 }
-
-/*
-fn write_samples<T: cpal::Sample>(data: &mut [T], next_sample_chunk: &mut dyn FnMut() -> &[i16]) {
-    for frame in data.chunks_mut(1024) {
-        let values = next_sample_chunk().map(|sample| cpal::Sample::from::<i16>(sample)).collect();
-        frame = values;
-    }
-}
-*/
 
 pub enum PlayerState {
     Unstarted,
@@ -222,12 +161,10 @@ fn main() {
         let mut next_sample = move || {
             let state_guard = state_clone.lock().unwrap();
             match *state_guard {
-                PlayerState::Playing => {
-                    match audio_consumer.pop() {
-                        Some(data) => data,
-                        None => 0i16,
-                    }
-                }
+                PlayerState::Playing => match audio_consumer.pop() {
+                    Some(data) => data,
+                    None => 0i16,
+                },
                 _ => 0i16,
             }
         };
@@ -266,15 +203,11 @@ fn main() {
         let mut audio_source: Option<Vec<i16>> = None;
 
         loop {
-
-            if let Some(mut audio_source1) = audio_source {
+            if let Some(audio_source1) = audio_source {
                 let mut audio_source_iter = audio_source1.into_iter();
 
                 loop {
-                    let written = audio_producer.push_iter(&mut audio_source_iter);
-                    tracing::info!("written: {written}");
-
-                    thread::sleep(std::time::Duration::from_millis(500));
+                    audio_producer.push_iter(&mut audio_source_iter);
 
                     match audio_rx.try_recv() {
                         Ok(cmd) => {
@@ -312,12 +245,13 @@ fn main() {
                                     let mp3_decoder = Mp3Decoder::new(buf)
                                         .expect("Failed to create mp3 decoder from file buffer");
 
-                                    let current_track_sample_rate = current_track_sample_rate.clone();
+                                    let current_track_sample_rate =
+                                        current_track_sample_rate.clone();
                                     let sample_rate = *(&mp3_decoder.sample_rate);
 
                                     {
                                         let mut guard = current_track_sample_rate.lock().unwrap();
-                                        *guard = sample_rate; 
+                                        *guard = sample_rate;
                                     }
 
                                     let start = std::time::Instant::now();
@@ -326,9 +260,12 @@ fn main() {
                                         .collect::<Vec<u8>>();
 
                                     let mut input_cursor = std::io::Cursor::new(&raw_samples);
-                                    let capacity = (*(&raw_samples.len()) as f32 * (device_sample_rate as f32 / sample_rate as f32)) as usize;
+                                    let capacity = (*(&raw_samples.len()) as f32
+                                        * (device_sample_rate as f32 / sample_rate as f32))
+                                        as usize;
                                     let mut output_buffer = Vec::with_capacity(capacity);
-                                    let mut output_cursor = std::io::Cursor::new(&mut output_buffer);
+                                    let mut output_cursor =
+                                        std::io::Cursor::new(&mut output_buffer);
                                     let channels = 2;
                                     let chunk_size = 1024;
                                     let sub_chunks = 2;
@@ -338,26 +275,34 @@ fn main() {
                                         device_sample_rate as usize,
                                         chunk_size,
                                         sub_chunks,
-                                        channels
-                                    ).unwrap();
+                                        channels,
+                                    )
+                                    .unwrap();
 
                                     let num_frames_per_channel = fft_resampler.input_frames_next();
                                     let sample_byte_size = 8;
-                                    let num_chunks = &raw_samples.len() / (sample_byte_size * channels * num_frames_per_channel);
+                                    let num_chunks = &raw_samples.len()
+                                        / (sample_byte_size * channels * num_frames_per_channel);
 
                                     for _chunk in 0..num_chunks {
-                                        let frame_data = read_frames(&mut input_cursor, num_frames_per_channel, channels);
-                                        let output = fft_resampler.process(&frame_data, None).unwrap();
+                                        let frame_data = read_frames(
+                                            &mut input_cursor,
+                                            num_frames_per_channel,
+                                            channels,
+                                        );
+                                        let output =
+                                            fft_resampler.process(&frame_data, None).unwrap();
                                         write_frames(output, &mut output_cursor, channels);
                                     }
-
 
                                     let resampled_audio = output_buffer
                                         .iter()
                                         .as_slice()
                                         .chunks(4)
                                         .map(|chunk| {
-                                            (f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])) as i16
+                                            (f32::from_le_bytes([
+                                                chunk[0], chunk[1], chunk[2], chunk[3],
+                                            ])) as i16
                                         })
                                         //.into_iter();
                                         .collect::<Vec<i16>>();
@@ -373,7 +318,7 @@ fn main() {
                             }
                         }
                         Err(_) => (), // When no commands are sent, this will evaluate. aka - it is the
-                                    // common case. No need to print anything
+                                      // common case. No need to print anything
                     }
                 }
             } else {
@@ -394,7 +339,7 @@ fn main() {
 
                                 {
                                     let mut guard = current_track_sample_rate.lock().unwrap();
-                                    *guard = sample_rate; 
+                                    *guard = sample_rate;
                                 }
 
                                 let start = std::time::Instant::now();
@@ -403,7 +348,9 @@ fn main() {
                                     .collect::<Vec<u8>>();
 
                                 let mut input_cursor = std::io::Cursor::new(&raw_samples);
-                                let capacity = (*(&raw_samples.len()) as f32 * (device_sample_rate as f32 / sample_rate as f32)) as usize;
+                                let capacity = (*(&raw_samples.len()) as f32
+                                    * (device_sample_rate as f32 / sample_rate as f32))
+                                    as usize;
                                 let mut output_buffer = Vec::with_capacity(capacity);
                                 let mut output_cursor = std::io::Cursor::new(&mut output_buffer);
                                 let channels = 2;
@@ -415,15 +362,21 @@ fn main() {
                                     device_sample_rate as usize,
                                     chunk_size,
                                     sub_chunks,
-                                    channels
-                                ).unwrap();
+                                    channels,
+                                )
+                                .unwrap();
 
                                 let num_frames_per_channel = fft_resampler.input_frames_next();
                                 let sample_byte_size = 8;
-                                let num_chunks = &raw_samples.len() / (sample_byte_size * channels * num_frames_per_channel);
+                                let num_chunks = &raw_samples.len()
+                                    / (sample_byte_size * channels * num_frames_per_channel);
 
                                 for _chunk in 0..num_chunks {
-                                    let frame_data = read_frames(&mut input_cursor, num_frames_per_channel, channels);
+                                    let frame_data = read_frames(
+                                        &mut input_cursor,
+                                        num_frames_per_channel,
+                                        channels,
+                                    );
                                     let output = fft_resampler.process(&frame_data, None).unwrap();
                                     write_frames(output, &mut output_cursor, channels);
                                 }
@@ -433,7 +386,9 @@ fn main() {
                                     .as_slice()
                                     .chunks(4)
                                     .map(|chunk| {
-                                        (f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])) as i16
+                                        (f32::from_le_bytes([
+                                            chunk[0], chunk[1], chunk[2], chunk[3],
+                                        ])) as i16
                                     })
                                     //.into_iter();
                                     .collect::<Vec<i16>>();
@@ -448,7 +403,7 @@ fn main() {
                         }
                     }
                     Err(_) => (), // When no commands are sent, this will evaluate. aka - it is the
-                                // common case. No need to print anything
+                                  // common case. No need to print anything
                 }
             }
         }

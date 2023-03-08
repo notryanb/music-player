@@ -1,6 +1,6 @@
 use crate::app::LibraryItem;
-use serde::{Deserialize, Serialize};
 use crate::AudioCommand;
+use serde::{Deserialize, Serialize};
 use std::sync::mpsc::Sender;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
