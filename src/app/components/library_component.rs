@@ -3,7 +3,7 @@ use crate::app::library::{LibraryItemContainer, ViewType};
 use crate::app::{App, Library, LibraryItem, LibraryView};
 use itertools::Itertools;
 
-use id3::Tag;
+use id3::{Tag, TagLike};
 use rayon::prelude::*;
 
 pub struct LibraryComponent;

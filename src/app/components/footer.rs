@@ -22,7 +22,6 @@ impl AppComponent for Footer {
                             .as_path()
                             .file_name()
                             .unwrap()
-                            .clone()
                             .to_os_string()
                             .into_string()
                             .unwrap(),

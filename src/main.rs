@@ -3,10 +3,12 @@ pub use crate::app::App;
 pub use crate::app::*;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::{FromSample, SizedSample};
 use cpal::SampleFormat;
 use eframe::egui;
 use minimp3::{Decoder, Frame};
 use ringbuf::HeapRb;
+use ringbuf::traits::{Consumer, Producer, Split};
 use rubato::Resampler;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
@@ -106,9 +108,9 @@ fn write_frames<W: Write + Seek>(waves: Vec<Vec<f32>>, output_buffer: &mut W, ch
     }
 }
 
-fn write_sample<T: cpal::Sample>(data: &mut [T], next_sample: &mut dyn FnMut() -> i16) {
+fn write_sample<T: SizedSample + FromSample<i16>>(data: &mut [T], next_sample: &mut dyn FnMut() -> i16) {
     for frame in data.chunks_mut(1) {
-        let value = cpal::Sample::from::<i16>(&next_sample());
+        let value = T::from_sample(next_sample());
         for sample in frame.iter_mut() {
             *sample = value;
         }
@@ -229,7 +231,7 @@ fn main() {
         let mut next_sample = move || {
             let state_guard = state_clone.lock().unwrap();
             match *state_guard {
-                PlayerState::Playing => match audio_consumer.pop() {
+                PlayerState::Playing => match audio_consumer.try_pop() {
                     Some(data) => data,
                     None => 0i16,
                 },
@@ -246,6 +248,7 @@ fn main() {
                     write_sample(data, &mut next_sample)
                 },
                 output_err_fn,
+                None
             ),
             SampleFormat::I16 => device.build_output_stream(
                 &config,
@@ -253,6 +256,7 @@ fn main() {
                     write_sample(data, &mut next_sample)
                 },
                 output_err_fn,
+                None
             ),
             SampleFormat::U16 => device.build_output_stream(
                 &config,
@@ -260,7 +264,9 @@ fn main() {
                     write_sample(data, &mut next_sample)
                 },
                 output_err_fn,
+                None
             ),
+            _ => todo!(),
         }
         .expect("Failed to build output stream");
 
