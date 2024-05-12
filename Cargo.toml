@@ -21,7 +21,7 @@ walkdir = "2.5"
 rubato = "0.12.0"
 rand = "0.8.5"
 ringbuf = "0.4"
-symphonia = "0.5.4"
+symphonia = { version = "0.5.4", features = ["mp3"] }
 arrayvec = "0.7.4"
 rb = "0.4.1"
 

@@ -11,12 +11,12 @@ impl AppComponent for PlayerComponent {
         ui.horizontal(|ui| {
             let sample_rate = 44_100; // This is bad. I should be storing this per track
 
-            let cursor = &ctx.player.as_ref().unwrap().cursor.load(Relaxed);
-            let current_seconds = (*cursor as f32 / sample_rate as f32) as u32;
-            ctx.player
-                .as_mut()
-                .unwrap()
-                .set_seek_in_seconds(current_seconds);
+            // let cursor = &ctx.player.as_ref().unwrap().cursor.load(Relaxed);
+            // let current_seconds = (*cursor as f32 / sample_rate as f32) as u32;
+            // ctx.player
+            //     .as_mut()
+            //     .unwrap()
+            //     .set_seek_in_seconds(current_seconds);
 
             let stop_btn = ui.button("■");
             let play_btn = ui.button("▶");

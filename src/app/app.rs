@@ -39,6 +39,7 @@ impl eframe::App for App {
             frame.set_window_title(&display);
         }
 
+        
         egui::TopBottomPanel::top("MusicPlayer").show(ctx, |ui| {
             MenuBar::add(self, ui);
         });

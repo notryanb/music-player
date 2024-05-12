@@ -167,7 +167,7 @@ mod pulseaudio {
 
 #[cfg(not(target_os = "linux"))]
 mod cpal {
-    use crate::resampler::Resampler;
+    use crate::app::resampler::Resampler;
 
     use super::{AudioOutput, AudioOutputError, Result};
 
