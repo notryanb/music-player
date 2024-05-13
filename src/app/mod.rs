@@ -9,11 +9,6 @@ mod components;
 mod library;
 pub mod player;
 mod playlist;
-mod output;
-mod resampler;
-
-use crate::app::output::AudioOutput;
-
 
 pub enum AudioCommand {
     Stop,
@@ -56,7 +51,6 @@ impl Default for App {
             playlists: vec![],
             current_playlist_idx: None,
             player: None,
-            
             playlist_idx_to_remove: None,
             library_sender: None,
             library_receiver: None,
@@ -92,59 +86,4 @@ impl App {
     pub fn quit(&mut self) {
         self.quit = true;
     }
-
-    // fn process_audio_cmds(&mut self) {
-    //         match audio_rx.try_recv() {
-    //             Ok(cmd) => {
-    //                 match cmd {
-    //                     AudioCommand::Seek(seconds) => {
-    //                         tracing::info!("Processing SEEK command for {} seconds", seconds);
-
-
-    //                         // // TODO - Need to figure out how to implement using iterator + ring buf
-    //                         // let guard = current_track_sample_rate.lock().unwrap();
-    //                         // let sample_num = *guard * seconds as u32;
-    //                         // drop(guard);
-    //                         // cursor.swap(sample_num, Relaxed);
-    //                     }
-    //                     AudioCommand::Stop => {
-    //                         tracing::info!("Processing STOP command");
-    //                         {
-    //                             let mut state_guard = state.lock().unwrap();
-    //                             *state_guard = PlayerState::Stopped;
-    //                         }
-
-    //                         // // TODO - Doing this incurs an extra allocation.
-    //                         // // Also, when stopping the ring buffer isn't flushed, so when
-    //                         // // you start to play again there is still data to consume from
-    //                         // // the previous track
-    //                         // audio_source = audio_source_clone;
-    //                     }
-    //                     AudioCommand::Pause => {
-    //                         tracing::info!("Processing PAUSE command");
-
-
-    //                         // let mut state_guard = state.lock().unwrap();
-    //                         // *state_guard = PlayerState::Paused;
-    //                     }
-    //                     AudioCommand::Play => {
-    //                         tracing::info!("Processing PLAY command");
-                            
-
-    //                         // let mut state_guard = state.lock().unwrap();
-    //                         // *state_guard = PlayerState::Playing;
-    //                     }
-    //                     AudioCommand::LoadFile(path) => {
-    //                         // let resampled_audio = load_file(path, device_sample_rate);
-    //                         // audio_source = Some(resampled_audio);
-    //                         tracing::info!("Processing LOAD FILE command for path: {:?}", &path);
-
-    //                     }
-    //                     _ => tracing::warn!("Unhandled case in audio command loop"),
-    //                 }
-    //             }
-    //             Err(_) => (), // When no commands are sent, this will evaluate. aka - it is the
-    //                             // common case. No need to print anything
-    //         }
-    // }
 }
