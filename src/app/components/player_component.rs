@@ -1,5 +1,5 @@
 use super::AppComponent;
-use crate::app::App;
+use crate::{app::App, UiCommand};
 use std::sync::atomic::Ordering::Relaxed;
 
 pub struct PlayerComponent;
@@ -11,12 +11,12 @@ impl AppComponent for PlayerComponent {
         ui.horizontal(|ui| {
             let sample_rate = 44_100; // This is bad. I should be storing this per track
 
-            let cursor = &ctx.player.as_ref().unwrap().cursor.load(Relaxed);
-            let current_seconds = (*cursor as f32 / sample_rate as f32) as u32;
-            ctx.player
-                .as_mut()
-                .unwrap()
-                .set_seek_in_seconds(current_seconds);
+            // let cursor = &ctx.player.as_ref().unwrap().cursor.load(Relaxed);
+            // let current_seconds = (*cursor as f32 / sample_rate as f32) as u32;
+            // ctx.player
+            //     .as_mut()
+            //     .unwrap()
+            //     .set_seek_in_seconds(current_seconds);
 
             let stop_btn = ui.button("■");
             let play_btn = ui.button("▶");
@@ -26,28 +26,51 @@ impl AppComponent for PlayerComponent {
 
             let mut volume = ctx.player.as_ref().unwrap().volume;
             ui.add(
-                eframe::egui::Slider::new(&mut volume, (0.0 as f32)..=(5.0 as f32))
-                    .logarithmic(false)
-                    .show_value(false)
-                    .clamp_to_range(true),
-            );
-            ctx.player.as_mut().unwrap().set_volume(volume);
-
-            // Time Slider
-            let mut seek_in_seconds = ctx.player.as_ref().unwrap().seek_in_seconds;
-            let time_slider = ui.add(
-                eframe::egui::Slider::new(&mut seek_in_seconds, 0..=(10 * 60))
+                eframe::egui::Slider::new(&mut volume, (0.0 as f32)..=(1.0 as f32))
                     .logarithmic(false)
                     .show_value(true)
                     .clamp_to_range(true),
             );
-            ctx.player
-                .as_mut()
-                .unwrap()
-                .set_seek_in_seconds(seek_in_seconds);
+            ctx.player.as_mut().unwrap().set_volume(volume);
 
-            if time_slider.drag_released() {
-                ctx.player.as_mut().unwrap().seek_to(seek_in_seconds);
+            let ui_cmd = ctx.player.as_ref().unwrap().ui_rx.try_recv();
+
+            if let Ok(new_seek_cmd) = ui_cmd {
+                match new_seek_cmd {
+                    UiCommand::CurrentSeconds(sec) => {
+                        let mut seek_in_seconds = sec;
+                        _ = ui.add(
+                            eframe::egui::Slider::new(&mut seek_in_seconds, 0..=(130))
+                                .logarithmic(false)
+                                .show_value(true)
+                                .clamp_to_range(true),
+                        );
+
+                        ctx.player
+                            .as_mut()
+                            .unwrap()
+                            .set_seek_in_seconds(seek_in_seconds);
+                    },
+                    _ => {}
+                }
+            } else {
+                // Time Slider
+                let mut seek_in_seconds = ctx.player.as_ref().unwrap().seek_in_seconds;
+                let time_slider = ui.add(
+                    eframe::egui::Slider::new(&mut seek_in_seconds, 0..=(130))
+                        .logarithmic(false)
+                        .show_value(true)
+                        .clamp_to_range(true),
+                );
+
+                ctx.player
+                    .as_mut()
+                    .unwrap()
+                    .set_seek_in_seconds(seek_in_seconds);
+
+                if time_slider.drag_released() {
+                    ctx.player.as_mut().unwrap().seek_to(seek_in_seconds);
+                }
             }
 
             if let Some(_selected_track) = &ctx.player.as_mut().unwrap().selected_track {

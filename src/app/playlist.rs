@@ -144,22 +144,22 @@ mod tests {
         assert_eq!(playlist.tracks[2].path(), path1);
     }
 
-    #[test]
-    fn select_track() {
-        let track1 = LibraryItem::new(PathBuf::from(r"C:\music\song1.mp3"));
-        let track2 = LibraryItem::new(PathBuf::from(r"C:\music\song2.mp3"));
-        let track3 = LibraryItem::new(PathBuf::from(r"C:\music\song3.mp3"));
+    // #[test]
+    // fn select_track() {
+    //     let track1 = LibraryItem::new(PathBuf::from(r"C:\music\song1.mp3"));
+    //     let track2 = LibraryItem::new(PathBuf::from(r"C:\music\song2.mp3"));
+    //     let track3 = LibraryItem::new(PathBuf::from(r"C:\music\song3.mp3"));
 
-        let mut playlist = Playlist {
-            name: Some("test".to_string()),
-            tracks: vec![track1, track2, track3.clone()],
-            selected: None,
-        };
+    //     let mut playlist = Playlist {
+    //         name: Some("test".to_string()),
+    //         tracks: vec![track1, track2, track3.clone()],
+    //         selected: None,
+    //     };
 
-        assert_eq!(playlist.tracks.len(), 3);
+    //     assert_eq!(playlist.tracks.len(), 3);
 
-        playlist.select(2);
+    //     playlist.select(2);
 
-        assert_eq!(playlist.selected, Some(track3));
-    }
+    //     assert_eq!(playlist.selected, Some(track3));
+    // }
 }

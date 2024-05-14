@@ -14,10 +14,15 @@ pub enum AudioCommand {
     Stop,
     Play,
     Pause,
-    Seek(u32), // Maybe this should represent a duration?
+    Seek(u64),
     LoadFile(std::path::PathBuf),
     Select(usize),
     SetVolume(f32),
+}
+
+pub enum UiCommand {
+    TotalTrackDuration(u64),
+    CurrentSeconds(u64),
 }
 
 #[derive(Serialize, Deserialize)]
