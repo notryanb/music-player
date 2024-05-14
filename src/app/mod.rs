@@ -21,8 +21,9 @@ pub enum AudioCommand {
 }
 
 pub enum UiCommand {
+    AudioFinished,
     TotalTrackDuration(u64),
-    CurrentSeconds(u64),
+    CurrentTimestamp(u64),
 }
 
 #[derive(Serialize, Deserialize)]

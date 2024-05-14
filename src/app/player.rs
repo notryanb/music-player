@@ -11,7 +11,8 @@ pub struct Player {
     pub audio_tx: Sender<AudioCommand>,
     pub ui_rx: Receiver<UiCommand>,
     pub volume: f32,
-    pub seek_in_seconds: u64,
+    pub seek_to_timestamp: u64,
+    pub duration: u64,
     pub cursor: Arc<AtomicU32>, // This can "overflow"
 }
 
@@ -23,7 +24,8 @@ impl Player {
             audio_tx: audio_cmd_tx,
             ui_rx: ui_cmd_rx,
             volume: 1.0,
-            seek_in_seconds: 0, // TODO: This should have subsecond precision, but is okay for now.
+            seek_to_timestamp: 0, // TODO: This should have subsecond precision, but is okay for now.
+            duration: 0,
             cursor,
         }
     }
@@ -45,10 +47,10 @@ impl Player {
         }
     }
 
-    pub fn seek_to(&mut self, seconds: u64) {
-        self.seek_in_seconds = seconds;
+    pub fn seek_to(&mut self, seek_to_timestamp: u64) {
+        self.seek_to_timestamp = seek_to_timestamp;
         self.audio_tx
-            .send(AudioCommand::Seek(seconds))
+            .send(AudioCommand::Seek(seek_to_timestamp))
             .expect("Failed to send seek to audio thread");
     }
 
@@ -137,8 +139,12 @@ impl Player {
         //     .expect("Failed to send play to audio thread");
     }
 
-    pub fn set_seek_in_seconds(&mut self, seek_in_seconds: u64) {
-        self.seek_in_seconds = seek_in_seconds;
+    pub fn set_seek_to_timestamp(&mut self, seek_to_timestamp: u64) {
+        self.seek_to_timestamp = seek_to_timestamp;
+    }
+
+    pub fn set_duration(&mut self, duration: u64) {
+        self.duration = duration;
     }
 }
 

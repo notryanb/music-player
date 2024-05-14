@@ -48,13 +48,12 @@ fn main() {
             seek: None,
             decode_opts: None,
             track_info: None,
+            duration: 0,
         };
 
         let mut decoder: Option<Box<dyn symphonia::core::codecs::Decoder>> = None;
         let mut _volume = 1.0;
         let mut current_track_path: Option<PathBuf> = None;
-        let time_base = 1.0 / 44100.0; // This needs to be based on the file...
-        // let mut current_track_seconds = 0.0;
 
         loop {
             process_audio_cmd(&audio_rx, &mut state);
@@ -81,18 +80,16 @@ fn main() {
                                 break Err(err)
                             },
                         };
-
-
-                        let current_track_seconds = *&packet.ts as f64 * time_base;
-                        ui_tx
-                            .send(UiCommand::CurrentSeconds(current_track_seconds as u64))
-                            .expect("Failed to send play to audio thread");
-
+                        
                         // If the packet does not belong to the selected track, skip it.
                         if packet.track_id() != play_opts.track_id {
                             tracing::warn!("packet track id doesn't match track id");
                             continue;
                         }
+
+                        ui_tx
+                            .send(UiCommand::CurrentTimestamp(packet.ts))
+                            .expect("Failed to send play to ui thread");
                     
                         // Decode the packet into audio samples.
                         match decoder.as_mut().unwrap().decode(&packet) {
@@ -156,7 +153,7 @@ fn main() {
 
                     audio_engine_state.audio_output = None;
                 },
-                PlayerState::SeekTo(seconds) => {
+                PlayerState::SeekTo(seek_timestamp) => {
                     if let Some(ref current_track_path) = current_track_path {
                         // Stop current playback
                         if let Some(audio_output) = audio_engine_state.audio_output.as_mut() {
@@ -165,7 +162,7 @@ fn main() {
                         
                         audio_engine_state.audio_output = None;
 
-                        load_file(current_track_path, &mut audio_engine_state, &mut decoder, seconds as f64);
+                        load_file(current_track_path, &mut audio_engine_state, &mut decoder, seek_timestamp);
                         state = PlayerState::Playing;
                     }
                 },
@@ -178,11 +175,11 @@ fn main() {
                     audio_engine_state.audio_output = None;
                     
                     current_track_path = Some((*path).clone());
-                    load_file(path, &mut audio_engine_state, &mut decoder, 0.0);
+                    load_file(path, &mut audio_engine_state, &mut decoder, 0);
                     // TODO - Get total u64 track duration and send to Ui
-                    // ui_tx
-                    //     .send(UiCommand::TotalTrackDuration(current_track_seconds as u64))
-                    //     .expect("Failed to send play to audio thread");
+                    ui_tx
+                        .send(UiCommand::TotalTrackDuration(audio_engine_state.duration))
+                        .expect("Failed to send play to audio thread");
 
                     state = PlayerState::Playing;
                 }
@@ -237,7 +234,7 @@ fn process_audio_cmd(audio_rx: &Receiver<AudioCommand>, state: &mut PlayerState)
 
 enum SeekPosition {
     Time(f64),
-    Timetamp(u64),
+    Timestamp(u64),
 }
 
 #[derive(Copy, Clone)]
@@ -264,20 +261,21 @@ struct AudioEngineState {
     pub seek: Option<SeekPosition>,
     pub decode_opts: Option<DecoderOptions>,
     pub track_info: Option<PlayTrackOptions>,
+    pub duration: u64,
 }
 
 fn load_file(
     path: &PathBuf, 
     audio_engine_state: &mut AudioEngineState, 
     decoder: &mut Option<Box<dyn symphonia::core::codecs::Decoder>>, 
-    seek_to_seconds: f64
+    seek_timestamp: u64
 ) {
     let hint = Hint::new();
     let source = Box::new(std::fs::File::open(path).expect("couldn't open file"));
     let mss = MediaSourceStream::new(source, Default::default());
     let format_opts = FormatOptions { enable_gapless: true, ..Default::default() };
     let metadata_opts: MetadataOptions = Default::default();
-    let seek = Some(SeekPosition::Time(seek_to_seconds));
+    let seek = Some(SeekPosition::Timestamp(seek_timestamp));
 
     match symphonia::default::get_probe().format(&hint, mss, &format_opts, &metadata_opts) {
         Ok(probed) => {
@@ -308,9 +306,13 @@ fn load_file(
         
             // Get the selected track's timebase and duration.
             let _tb = track.codec_params.time_base;
-            let _dur = track.codec_params.n_frames.map(|frames| track.codec_params.start_ts + frames);
+            let dur = track.codec_params.n_frames.map(|frames| track.codec_params.start_ts + frames);
 
-            tracing::info!("Track Duration: {}, TimeBase: {}", _dur.unwrap_or(0), _tb.unwrap());
+            if let Some(duration) = dur {
+                audio_engine_state.duration = duration;
+            }
+
+            tracing::info!("Track Duration: {}, TimeBase: {}", dur.unwrap_or(0), _tb.unwrap());
         }
         Err(err) => {
             // The input was not supported by any format reader.
@@ -345,7 +347,7 @@ fn setup_audio_reader(audio_engine_state: &mut AudioEngineState) -> Result<i32> 
     let seek_ts = if let Some(seek) = seek {
         let seek_to = match seek {
             SeekPosition::Time(t) => SeekTo::Time { time: Time::from(*t), track_id: Some(track_id) },
-            SeekPosition::Timetamp(ts) => SeekTo::TimeStamp { ts: *ts, track_id },
+            SeekPosition::Timestamp(ts) => SeekTo::TimeStamp { ts: *ts, track_id },
         };
 
         // Attempt the seek. If the seek fails, ignore the error and return a seek timestamp of 0 so

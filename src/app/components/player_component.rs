@@ -1,6 +1,6 @@
 use super::AppComponent;
 use crate::{app::App, UiCommand};
-use std::sync::atomic::Ordering::Relaxed;
+// use std::sync::atomic::Ordering::Relaxed;
 
 pub struct PlayerComponent;
 
@@ -16,7 +16,7 @@ impl AppComponent for PlayerComponent {
             // ctx.player
             //     .as_mut()
             //     .unwrap()
-            //     .set_seek_in_seconds(current_seconds);
+            //     .set_seek_to_timestamp(current_seconds);
 
             let stop_btn = ui.button("■");
             let play_btn = ui.button("▶");
@@ -33,43 +33,59 @@ impl AppComponent for PlayerComponent {
             );
             ctx.player.as_mut().unwrap().set_volume(volume);
 
-            let ui_cmd = ctx.player.as_ref().unwrap().ui_rx.try_recv();
-
-            if let Ok(new_seek_cmd) = ui_cmd {
+            // TODO - Check for currently dragging the slider so it doesn't compete with the user
+            if let Ok(new_seek_cmd) = ctx.player.as_ref().unwrap().ui_rx.try_recv() {
                 match new_seek_cmd {
-                    UiCommand::CurrentSeconds(sec) => {
-                        let mut seek_in_seconds = sec;
-                        _ = ui.add(
-                            eframe::egui::Slider::new(&mut seek_in_seconds, 0..=(130))
+                    UiCommand::CurrentTimestamp(seek_timestamp) => {
+                        let mut seek_to_timestamp = seek_timestamp;
+                        let duration = ctx.player.as_ref().unwrap().duration;
+
+                        ui.add(
+                            eframe::egui::Slider::new(&mut seek_to_timestamp, 0..=duration)
                                 .logarithmic(false)
-                                .show_value(true)
+                                .show_value(false)
+                                .clamp_to_range(true)
+                        );
+
+                        ctx.player
+                            .as_mut()
+                            .unwrap()
+                            .set_seek_to_timestamp(seek_to_timestamp);
+                    },
+                    UiCommand::TotalTrackDuration(dur) => {
+                        let mut seek_to_timestamp = ctx.player.as_ref().unwrap().seek_to_timestamp;
+                        _ = ui.add(
+                            eframe::egui::Slider::new(&mut seek_to_timestamp, 0..=dur)
+                                .logarithmic(false)
+                                .show_value(false)
                                 .clamp_to_range(true),
                         );
 
                         ctx.player
                             .as_mut()
                             .unwrap()
-                            .set_seek_in_seconds(seek_in_seconds);
+                            .set_duration(dur);                        
                     },
                     _ => {}
                 }
             } else {
                 // Time Slider
-                let mut seek_in_seconds = ctx.player.as_ref().unwrap().seek_in_seconds;
+                let mut seek_to_timestamp = ctx.player.as_ref().unwrap().seek_to_timestamp;
+                let duration = ctx.player.as_ref().unwrap().duration;
                 let time_slider = ui.add(
-                    eframe::egui::Slider::new(&mut seek_in_seconds, 0..=(130))
+                    eframe::egui::Slider::new(&mut seek_to_timestamp, 0..=duration)
                         .logarithmic(false)
-                        .show_value(true)
+                        .show_value(false)
                         .clamp_to_range(true),
                 );
 
                 ctx.player
                     .as_mut()
                     .unwrap()
-                    .set_seek_in_seconds(seek_in_seconds);
+                    .set_seek_to_timestamp(seek_to_timestamp);
 
                 if time_slider.drag_released() {
-                    ctx.player.as_mut().unwrap().seek_to(seek_in_seconds);
+                    ctx.player.as_mut().unwrap().seek_to(seek_to_timestamp);
                 }
             }
 
