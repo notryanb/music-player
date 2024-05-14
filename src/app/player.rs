@@ -1,25 +1,27 @@
 use crate::app::library::LibraryItem;
 use crate::app::playlist::Playlist;
-use crate::AudioCommand;
+use crate::{AudioCommand, UiCommand};
 use std::sync::atomic::AtomicU32;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
 
 pub struct Player {
     pub track_state: TrackState,
     pub selected_track: Option<LibraryItem>,
     pub audio_tx: Sender<AudioCommand>,
+    pub ui_rx: Receiver<UiCommand>,
     pub volume: f32,
-    pub seek_in_seconds: u32,
+    pub seek_in_seconds: u64,
     pub cursor: Arc<AtomicU32>, // This can "overflow"
 }
 
 impl Player {
-    pub fn new(audio_cmd_tx: Sender<AudioCommand>, cursor: Arc<AtomicU32>) -> Self {
+    pub fn new(audio_cmd_tx: Sender<AudioCommand>, ui_cmd_rx: Receiver<UiCommand>, cursor: Arc<AtomicU32>) -> Self {
         Self {
             track_state: TrackState::Unstarted,
             selected_track: None,
             audio_tx: audio_cmd_tx,
+            ui_rx: ui_cmd_rx,
             volume: 1.0,
             seek_in_seconds: 0, // TODO: This should have subsecond precision, but is okay for now.
             cursor,
@@ -43,7 +45,7 @@ impl Player {
         }
     }
 
-    pub fn seek_to(&mut self, seconds: u32) {
+    pub fn seek_to(&mut self, seconds: u64) {
         self.seek_in_seconds = seconds;
         self.audio_tx
             .send(AudioCommand::Seek(seconds))
@@ -127,12 +129,15 @@ impl Player {
         }
     }
 
+    // TODO - Need to only send message when volume has changed
     pub fn set_volume(&mut self, volume: f32) {
         self.volume = volume;
-        //self.sink.set_volume(volume);
+        // self.audio_tx
+        //     .send(AudioCommand::SetVolume(volume))
+        //     .expect("Failed to send play to audio thread");
     }
 
-    pub fn set_seek_in_seconds(&mut self, seek_in_seconds: u32) {
+    pub fn set_seek_in_seconds(&mut self, seek_in_seconds: u64) {
         self.seek_in_seconds = seek_in_seconds;
     }
 }

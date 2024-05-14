@@ -264,7 +264,8 @@ mod cpal {
             };
 
             // Create a ring buffer with a capacity for up-to 200ms of audio.
-            let ring_len = ((200 * config.sample_rate.0 as usize) / 1000) * num_channels;
+            // let ring_len = ((2 * config.sample_rate.0 as usize) / 1000) * num_channels;
+            let ring_len: usize = 4096;
 
             let ring_buf = SpscRb::new(ring_len);
             let (ring_buf_producer, ring_buf_consumer) = (ring_buf.producer(), ring_buf.consumer());

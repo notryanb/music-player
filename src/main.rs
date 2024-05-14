@@ -27,22 +27,15 @@ fn main() {
 
     let (tx, rx) = channel();
     let (audio_tx, audio_rx) = channel();
+    let (ui_tx, ui_rx) = channel();
     let cursor = Arc::new(AtomicU32::new(0));
-    let player = Player::new(audio_tx, cursor);
+    let player = Player::new(audio_tx, ui_rx, cursor);
 
     // App setup
     let mut app = App::load().unwrap_or_default();
     app.player = Some(player);
     app.library_sender = Some(tx);
     app.library_receiver = Some(rx);
-
-    // TODO
-    // Don't worry about creating an additional background audio thread.
-    // Cpal is putting my audio callback in a special thread. This callback will read from ringbuffer.
-    // All I need to do is set this up.
-    // The app will not need to send audio commands between threads. it can change the state of the app
-    // Then the app can have a match statement to handle every case of state change on update.
-
 
     // Audio output setup
     let _audio_thread = thread::spawn(move || {
@@ -58,7 +51,10 @@ fn main() {
         };
 
         let mut decoder: Option<Box<dyn symphonia::core::codecs::Decoder>> = None;
-
+        let mut _volume = 1.0;
+        let mut current_track_path: Option<PathBuf> = None;
+        let time_base = 1.0 / 44100.0; // This needs to be based on the file...
+        // let mut current_track_seconds = 0.0;
 
         loop {
             process_audio_cmd(&audio_rx, &mut state);
@@ -85,6 +81,12 @@ fn main() {
                                 break Err(err)
                             },
                         };
+
+
+                        let current_track_seconds = *&packet.ts as f64 * time_base;
+                        ui_tx
+                            .send(UiCommand::CurrentSeconds(current_track_seconds as u64))
+                            .expect("Failed to send play to audio thread");
 
                         // If the packet does not belong to the selected track, skip it.
                         if packet.track_id() != play_opts.track_id {
@@ -154,63 +156,40 @@ fn main() {
 
                     audio_engine_state.audio_output = None;
                 },
+                PlayerState::SeekTo(seconds) => {
+                    if let Some(ref current_track_path) = current_track_path {
+                        // Stop current playback
+                        if let Some(audio_output) = audio_engine_state.audio_output.as_mut() {
+                            audio_output.flush()
+                        }
+                        
+                        audio_engine_state.audio_output = None;
+
+                        load_file(current_track_path, &mut audio_engine_state, &mut decoder, seconds as f64);
+                        state = PlayerState::Playing;
+                    }
+                },
+                PlayerState::LoadFile(ref path) => {
+                    // Stop current playback
+                    if let Some(audio_output) = audio_engine_state.audio_output.as_mut() {
+                        audio_output.flush()
+                    }
+                    
+                    audio_engine_state.audio_output = None;
+                    
+                    current_track_path = Some((*path).clone());
+                    load_file(path, &mut audio_engine_state, &mut decoder, 0.0);
+                    // TODO - Get total u64 track duration and send to Ui
+                    // ui_tx
+                    //     .send(UiCommand::TotalTrackDuration(current_track_seconds as u64))
+                    //     .expect("Failed to send play to audio thread");
+
+                    state = PlayerState::Playing;
+                }
                 PlayerState::Paused => {
                     // don't decode AND don't flush the buffer?
                 },
-                PlayerState::SeekTo(_seconds) => {},
                 PlayerState::Unstarted => {},
-                PlayerState::LoadFile(ref path) => {
-                    tracing::info!("IN LOADING STATE");
-
-                    let hint = Hint::new();
-                    let source = Box::new(std::fs::File::open(path).expect("couldn't open file"));
-                    let mss = MediaSourceStream::new(source, Default::default());
-                    let format_opts = FormatOptions { enable_gapless: true, ..Default::default() };
-                    let metadata_opts: MetadataOptions = Default::default();
-                    let seek = Some(SeekPosition::Time(0.0));
-
-                    match symphonia::default::get_probe().format(&hint, mss, &format_opts, &metadata_opts) {
-                        Ok(probed) => {
-                            // Set the decoder options.
-                            let decode_opts = DecoderOptions { verify: true, ..Default::default() };
-                
-                            audio_engine_state.reader = Some(probed.format);
-                            audio_engine_state.decode_opts = Some(decode_opts);
-                            audio_engine_state.seek = seek;                                
-                            
-                            // Configure everything for playback.
-                            _ = setup_audio_reader(&mut audio_engine_state);
-
-                            let reader = audio_engine_state.reader.as_mut().unwrap();
-                            let play_opts = audio_engine_state.track_info.unwrap();
-                            let decode_opts = audio_engine_state.decode_opts.unwrap();                                
-                        
-                            let track = match reader.tracks().iter().find(|track| track.id == play_opts.track_id) {
-                                Some(track) => track,
-                                _ => {
-                                    tracing::warn!("Couldn't find track");
-                                    return ();
-                                }
-                            };
-                        
-                            // Create a decoder for the track.
-                            decoder = Some(symphonia::default::get_codecs().make(&track.codec_params, &decode_opts).expect("Failed to get decoder"));
-                        
-                            // Get the selected track's timebase and duration.
-                            let _tb = track.codec_params.time_base;
-                            let _dur = track.codec_params.n_frames.map(|frames| track.codec_params.start_ts + frames);
-
-                            tracing::info!("Track Duration: {}", _dur.unwrap_or(0));
-
-                            state = PlayerState::Playing;
-                        }
-                        Err(err) => {
-                            // The input was not supported by any format reader.
-                            tracing::warn!("the audio format is not supported: {}", err);
-                            // Err(err);
-                        }
-                    }
-                }
             }
         }       
     }); // Audio Thread end
@@ -275,7 +254,7 @@ pub enum PlayerState {
     Playing,
     Paused,
     LoadFile(PathBuf),
-    SeekTo(u32),
+    SeekTo(u64),
 }
 
 struct AudioEngineState {
@@ -285,6 +264,60 @@ struct AudioEngineState {
     pub seek: Option<SeekPosition>,
     pub decode_opts: Option<DecoderOptions>,
     pub track_info: Option<PlayTrackOptions>,
+}
+
+fn load_file(
+    path: &PathBuf, 
+    audio_engine_state: &mut AudioEngineState, 
+    decoder: &mut Option<Box<dyn symphonia::core::codecs::Decoder>>, 
+    seek_to_seconds: f64
+) {
+    let hint = Hint::new();
+    let source = Box::new(std::fs::File::open(path).expect("couldn't open file"));
+    let mss = MediaSourceStream::new(source, Default::default());
+    let format_opts = FormatOptions { enable_gapless: true, ..Default::default() };
+    let metadata_opts: MetadataOptions = Default::default();
+    let seek = Some(SeekPosition::Time(seek_to_seconds));
+
+    match symphonia::default::get_probe().format(&hint, mss, &format_opts, &metadata_opts) {
+        Ok(probed) => {
+            // Set the decoder options.
+            let decode_opts = DecoderOptions { verify: true, ..Default::default() };
+
+            audio_engine_state.reader = Some(probed.format);
+            audio_engine_state.decode_opts = Some(decode_opts);
+            audio_engine_state.seek = seek;                                
+            
+            // Configure everything for playback.
+            _ = setup_audio_reader(audio_engine_state);
+
+            let reader = audio_engine_state.reader.as_mut().unwrap();
+            let play_opts = audio_engine_state.track_info.unwrap();
+            let decode_opts = audio_engine_state.decode_opts.unwrap();                                
+        
+            let track = match reader.tracks().iter().find(|track| track.id == play_opts.track_id) {
+                Some(track) => track,
+                _ => {
+                    tracing::warn!("Couldn't find track");
+                    return ();
+                }
+            };
+        
+            // Create a decoder for the track.
+            *decoder = Some(symphonia::default::get_codecs().make(&track.codec_params, &decode_opts).expect("Failed to get decoder"));
+        
+            // Get the selected track's timebase and duration.
+            let _tb = track.codec_params.time_base;
+            let _dur = track.codec_params.n_frames.map(|frames| track.codec_params.start_ts + frames);
+
+            tracing::info!("Track Duration: {}, TimeBase: {}", _dur.unwrap_or(0), _tb.unwrap());
+        }
+        Err(err) => {
+            // The input was not supported by any format reader.
+            tracing::warn!("the audio format is not supported: {}", err);
+            // Err(err);
+        }
+    }
 }
 
 
@@ -320,6 +353,7 @@ fn setup_audio_reader(audio_engine_state: &mut AudioEngineState) -> Result<i32> 
         match reader.seek(SeekMode::Accurate, seek_to) {
             Ok(seeked_to) => seeked_to.required_ts,
             Err(Error::ResetRequired) => {
+                tracing::warn!("reset required...");
                 // print_tracks(reader.tracks());
                 track_id = first_supported_track(reader.tracks()).unwrap().id;
                 0
@@ -335,6 +369,8 @@ fn setup_audio_reader(audio_engine_state: &mut AudioEngineState) -> Result<i32> 
         // If not seeking, the seek timestamp is 0.
         0
     };
+
+    tracing::info!("seek ts: {}", seek_ts);
 
     audio_engine_state.track_info = Some(PlayTrackOptions { track_id, seek_ts });
 
