@@ -61,12 +61,10 @@ fn main() {
             match state {
                 PlayerState::Playing => {
                     // decode the next packet.
-
-                    let result = loop {
-                        process_audio_cmd(&audio_rx, &mut state);
-
+                    let result: std::result::Result<(), symphonia::core::errors::Error> = 'once: {
                         if state != PlayerState::Playing {
-                            break Ok(())
+                            tracing::info!("AudioThread Playing - Got a different state, bailing");
+                            break 'once Ok(());
                         }  
                         
                         let reader = audio_engine_state.reader.as_mut().unwrap();
@@ -77,20 +75,26 @@ fn main() {
                             Ok(packet) => packet,
                             Err(err) =>  {
                                 tracing::warn!("couldn't decode next packet");
-                                break Err(err)
+                                // Track is over.. update the state to stopped and send message to
+                                // UI to play next track
+                                state = PlayerState::Stopped;
+                                ui_tx
+                                    .send(UiCommand::AudioFinished)
+                                    .expect("Failed to send play to ui thread");
+                                break 'once Err(err);
                             },
                         };
                         
                         // If the packet does not belong to the selected track, skip it.
                         if packet.track_id() != play_opts.track_id {
                             tracing::warn!("packet track id doesn't match track id");
-                            continue;
+                            break 'once Ok(());
                         }
 
                         ui_tx
                             .send(UiCommand::CurrentTimestamp(packet.ts))
                             .expect("Failed to send play to ui thread");
-                    
+                        
                         // Decode the packet into audio samples.
                         match decoder.as_mut().unwrap().decode(&packet) {
                             Ok(decoded) => {
@@ -115,32 +119,27 @@ fn main() {
                                 // Write the decoded audio samples to the audio output if the presentation timestamp
                                 // for the packet is >= the seeked position (0 if not seeking).
                                 if packet.ts() >= play_opts.seek_ts {
-                
-                                    // TODO - Send the progress back to GUI
-                                    // if !no_progress {
-                                    //     print_progress(packet.ts(), dur, tb);
-                                    // }
-                
                                     if let Some(audio_output) = audio_output {
                                         audio_output.write(decoded).unwrap()
                                     }
                                 }
+
+                                Ok(())
                             }
                             Err(Error::DecodeError(err)) => {
                                 // Decode errors are not fatal. Print the error message and try to decode the next
                                 // packet as usual.
                                 tracing::warn!("decode error: {}", err);
+                                break 'once Ok(())
                             }
-                            Err(err) => break Err(err),
+                            Err(err) => break 'once Err(err),
                         }
+
+                        //Ok(())
                     };
 
-                    if result.is_err() {
-                        tracing::error!("playing error");
-                    }
-
                     // Return if a fatal error occured.
-                    ignore_end_of_stream_error(result).expect("failed to ignore EoF");
+                    ignore_end_of_stream_error(result).expect("Encountered some other error than EoF");
                 
                     // Finalize the decoder and return the verification result if it's been enabled.
                     _ = do_verification(decoder.as_mut().unwrap().finalize());
@@ -148,12 +147,15 @@ fn main() {
                 PlayerState::Stopped => {
                     // Flush the audio buffer and reset the cpal audio context, which gets reconfigured on the next file loaded.
                     if let Some(audio_output) = audio_engine_state.audio_output.as_mut() {
+                        tracing::info!("Audio Thread Stopped - flushing output");
                         audio_output.flush()
                     }
 
                     audio_engine_state.audio_output = None;
+                    state = PlayerState::Stopped;
                 },
                 PlayerState::SeekTo(seek_timestamp) => {
+                    tracing::info!("AudioThread Seeking");
                     if let Some(ref current_track_path) = current_track_path {
                         // Stop current playback
                         if let Some(audio_output) = audio_engine_state.audio_output.as_mut() {
@@ -167,8 +169,10 @@ fn main() {
                     }
                 },
                 PlayerState::LoadFile(ref path) => {
+                    tracing::info!("AudioThread Loading File");
                     // Stop current playback
                     if let Some(audio_output) = audio_engine_state.audio_output.as_mut() {
+                        tracing::info!("AudioThread Loading File - Flushing output");
                         audio_output.flush()
                     }
                     
@@ -244,7 +248,7 @@ struct PlayTrackOptions {
 }
 
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum PlayerState {
     Unstarted,
     Stopped,
