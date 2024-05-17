@@ -195,10 +195,17 @@ fn main() {
         }       
     }); // Audio Thread end
 
-    let mut window_options = eframe::NativeOptions::default();
-    window_options.initial_window_size = Some(egui::Vec2::new(1024., 768.));
-    eframe::run_native("Music Player", window_options, Box::new(|_| Box::new(app)))
-        .expect("eframe failed: I should change main to return a result and use anyhow");
+    let native_options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([1024.0, 768.0]),
+        ..Default::default()
+    };
+
+    eframe::run_native(
+        "Music Player",
+        native_options,
+        Box::new(|_| Box::new(app))
+    ).expect("eframe failed: I should change main to return a result and use anyhow");
 }
 
 

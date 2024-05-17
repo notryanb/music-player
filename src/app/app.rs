@@ -15,7 +15,7 @@ impl eframe::App for App {
 
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         if self.quit {
-            frame.close();
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
 
         ctx.request_repaint();
@@ -36,7 +36,7 @@ impl eframe::App for App {
                 &selected_track.title().unwrap_or("?".to_string())
             );
 
-            frame.set_window_title(&display);
+            ctx.send_viewport_cmd(egui::ViewportCommand::Title(display));
         }
 
         

@@ -6,10 +6,9 @@ edition = "2021"
 
 [dependencies]
 cpal = "0.15"
-eframe = "0.21.3"
+eframe = "0.27.2"
 id3 = "1.13"
 itertools = "0.12"
-minimp3 = "0.5.1"
 rayon = "1.10"
 rfd = "0.6"
 serde = { version = "1", features=["derive"] }
@@ -20,7 +19,6 @@ log = { version = "0.4", features = ["release_max_level_info"] }
 walkdir = "2.5"
 rubato = "0.12.0"
 rand = "0.8.5"
-ringbuf = "0.4"
 symphonia = { version = "0.5.4", features = ["mp3"] }
 arrayvec = "0.7.4"
 rb = "0.4.1"

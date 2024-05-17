@@ -36,6 +36,7 @@ impl AppComponent for PlayerComponent {
             // TODO - Check for currently dragging the slider so it doesn't compete with the user
             // TODO - This is awful, I don't need to duplicate this logic... but I'm lazy right now
             // and just want to see it work.
+            // TODO - Sliders as rectangles and paint the area like in egui demo.
             if let Ok(new_seek_cmd) = ctx.player.as_ref().unwrap().ui_rx.try_recv() {
                 match new_seek_cmd {
                     UiCommand::CurrentTimestamp(seek_timestamp) => {
