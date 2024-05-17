@@ -1,6 +1,6 @@
 use super::AppComponent;
 use crate::{app::App, UiCommand};
-// use std::sync::atomic::Ordering::Relaxed;
+use crate::egui::style::HandleShape;
 
 pub struct PlayerComponent;
 
@@ -32,38 +32,17 @@ impl AppComponent for PlayerComponent {
                     .clamp_to_range(true),
             );
             ctx.player.as_mut().unwrap().set_volume(volume);
+                        
+            let mut seek_to_timestamp = ctx.player.as_ref().unwrap().seek_to_timestamp;
+            let mut duration = ctx.player.as_ref().unwrap().duration;
 
-            // TODO - Check for currently dragging the slider so it doesn't compete with the user
-            // TODO - This is awful, I don't need to duplicate this logic... but I'm lazy right now
-            // and just want to see it work.
-            // TODO - Sliders as rectangles and paint the area like in egui demo.
             if let Ok(new_seek_cmd) = ctx.player.as_ref().unwrap().ui_rx.try_recv() {
                 match new_seek_cmd {
                     UiCommand::CurrentTimestamp(seek_timestamp) => {
-                        let mut seek_to_timestamp = seek_timestamp;
-                        let duration = ctx.player.as_ref().unwrap().duration;
-
-                        ui.add(
-                            eframe::egui::Slider::new(&mut seek_to_timestamp, 0..=duration)
-                                .logarithmic(false)
-                                .show_value(false)
-                                .clamp_to_range(true)
-                        );
-
-                        ctx.player
-                            .as_mut()
-                            .unwrap()
-                            .set_seek_to_timestamp(seek_to_timestamp);
+                        seek_to_timestamp = seek_timestamp;
                     },
                     UiCommand::TotalTrackDuration(dur) => {
-                        let mut seek_to_timestamp = ctx.player.as_ref().unwrap().seek_to_timestamp;
-                        _ = ui.add(
-                            eframe::egui::Slider::new(&mut seek_to_timestamp, 0..=dur)
-                                .logarithmic(false)
-                                .show_value(false)
-                                .clamp_to_range(true),
-                        );
-
+                        duration = dur;
                         ctx.player
                             .as_mut()
                             .unwrap()
@@ -71,14 +50,6 @@ impl AppComponent for PlayerComponent {
                     },
                     UiCommand::AudioFinished => {
                         tracing::info!("Track finished, getting next...");
-                        let mut seek_to_timestamp = ctx.player.as_ref().unwrap().seek_to_timestamp;
-                        let duration = ctx.player.as_ref().unwrap().duration;
-                        _ = ui.add(
-                            eframe::egui::Slider::new(&mut seek_to_timestamp, 0..=duration)
-                                .logarithmic(false)
-                                .show_value(false)
-                                .clamp_to_range(true),
-                        );
 
                         ctx.player
                             .as_mut()
@@ -87,26 +58,29 @@ impl AppComponent for PlayerComponent {
                     },
                     _ => {}
                 }
-            } else {
-                // Time Slider
-                let mut seek_to_timestamp = ctx.player.as_ref().unwrap().seek_to_timestamp;
-                let duration = ctx.player.as_ref().unwrap().duration;
-                let time_slider = ui.add(
-                    eframe::egui::Slider::new(&mut seek_to_timestamp, 0..=duration)
-                        .logarithmic(false)
-                        .show_value(false)
-                        .clamp_to_range(true),
-                );
+            } 
 
-                ctx.player
-                    .as_mut()
-                    .unwrap()
-                    .set_seek_to_timestamp(seek_to_timestamp);
+            // Time Slider
+            let time_slider = ui.add(
+                eframe::egui::Slider::new(&mut seek_to_timestamp, 0..=duration)
+                    .logarithmic(false)
+                    .show_value(false)
+                    .clamp_to_range(true)
+                    .trailing_fill(true)
+                    .handle_shape(HandleShape::Rect { aspect_ratio: 0.5})
+            );
 
-                if time_slider.drag_released() {
-                    ctx.player.as_mut().unwrap().seek_to(seek_to_timestamp);
-                }
+            ctx.player
+                .as_mut()
+                .unwrap()
+                .set_seek_to_timestamp(seek_to_timestamp);
+
+            if time_slider.drag_released() {
+                tracing::info!("Trying to seek to {seek_to_timestamp}");
+                ctx.player.as_mut().unwrap().seek_to(seek_to_timestamp);
             }
+
+
 
             if let Some(_selected_track) = &ctx.player.as_mut().unwrap().selected_track {
                 if stop_btn.clicked() {
