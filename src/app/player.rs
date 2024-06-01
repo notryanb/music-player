@@ -17,7 +17,11 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(audio_cmd_tx: Sender<AudioCommand>, ui_cmd_rx: Receiver<UiCommand>, cursor: Arc<AtomicU32>) -> Self {
+    pub fn new(
+        audio_cmd_tx: Sender<AudioCommand>,
+        ui_cmd_rx: Receiver<UiCommand>,
+        cursor: Arc<AtomicU32>,
+    ) -> Self {
         Self {
             track_state: TrackState::Unstarted,
             selected_track: None,

@@ -1,6 +1,6 @@
 use super::AppComponent;
-use crate::{app::App, UiCommand};
 use crate::egui::style::HandleShape;
+use crate::{app::App, UiCommand};
 
 pub struct PlayerComponent;
 
@@ -32,7 +32,7 @@ impl AppComponent for PlayerComponent {
                     .clamp_to_range(true),
             );
             ctx.player.as_mut().unwrap().set_volume(volume);
-                        
+
             let mut seek_to_timestamp = ctx.player.as_ref().unwrap().seek_to_timestamp;
             let mut duration = ctx.player.as_ref().unwrap().duration;
 
@@ -40,14 +40,11 @@ impl AppComponent for PlayerComponent {
                 match new_seek_cmd {
                     UiCommand::CurrentTimestamp(seek_timestamp) => {
                         seek_to_timestamp = seek_timestamp;
-                    },
+                    }
                     UiCommand::TotalTrackDuration(dur) => {
                         duration = dur;
-                        ctx.player
-                            .as_mut()
-                            .unwrap()
-                            .set_duration(dur);                        
-                    },
+                        ctx.player.as_mut().unwrap().set_duration(dur);
+                    }
                     UiCommand::AudioFinished => {
                         tracing::info!("Track finished, getting next...");
 
@@ -55,10 +52,10 @@ impl AppComponent for PlayerComponent {
                             .as_mut()
                             .unwrap()
                             .next(&ctx.playlists[(ctx.current_playlist_idx).unwrap()]);
-                    },
-                    _ => {}
+                    }
+                    //_ => {}
                 }
-            } 
+            }
 
             // Time Slider
             let time_slider = ui.add(
@@ -67,7 +64,7 @@ impl AppComponent for PlayerComponent {
                     .show_value(false)
                     .clamp_to_range(true)
                     .trailing_fill(true)
-                    .handle_shape(HandleShape::Rect { aspect_ratio: 0.5})
+                    .handle_shape(HandleShape::Rect { aspect_ratio: 0.5 }),
             );
 
             ctx.player
@@ -75,12 +72,10 @@ impl AppComponent for PlayerComponent {
                 .unwrap()
                 .set_seek_to_timestamp(seek_to_timestamp);
 
-            if time_slider.drag_released() {
+            if time_slider.drag_stopped() {
                 tracing::info!("Trying to seek to {seek_to_timestamp}");
                 ctx.player.as_mut().unwrap().seek_to(seek_to_timestamp);
             }
-
-
 
             if let Some(_selected_track) = &ctx.player.as_mut().unwrap().selected_track {
                 if stop_btn.clicked() {

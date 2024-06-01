@@ -13,7 +13,12 @@ use symphonia::core::audio::{AudioBufferRef, SignalSpec};
 use symphonia::core::units::Duration;
 
 pub trait AudioOutput {
-    fn write(&mut self, decoded: AudioBufferRef<'_>) -> Result<()>;
+    //fn write(&mut self, decoded: AudioBufferRef<'_>) -> Result<()>;
+    fn write(
+        &mut self,
+        decoded: AudioBufferRef<'_>,
+        gui_ring_buf_producer: &rb::Producer<f32>,
+    ) -> Result<()>;
     fn flush(&mut self);
 }
 
@@ -28,6 +33,7 @@ pub enum AudioOutputError {
 
 pub type Result<T> = result::Result<T, AudioOutputError>;
 
+/*
 #[cfg(target_os = "linux")]
 mod pulseaudio {
     use super::{AudioOutput, AudioOutputError, Result};
@@ -97,7 +103,7 @@ mod pulseaudio {
     }
 
     impl AudioOutput for PulseAudioOutput {
-        fn write(&mut self, decoded: AudioBufferRef<'_>) -> Result<()> {
+        fn write(&mut self, decoded: AudioBufferRef<'_>, gui_ring_buf_producer: rb::Producer<f32>) -> Result<()> {
             // Do nothing if there are no audio frames.
             if decoded.frames() == 0 {
                 return Ok(());
@@ -164,6 +170,7 @@ mod pulseaudio {
         Some(map)
     }
 }
+*/
 
 #[cfg(not(target_os = "linux"))]
 mod cpal {
@@ -224,7 +231,7 @@ mod cpal {
                 cpal::SampleFormat::U16 => {
                     CpalAudioOutputImpl::<u16>::try_open(spec, duration, &device)
                 }
-                _ => panic!("Unsupported sample format")
+                _ => panic!("Unsupported sample format"),
             }
         }
     }
@@ -239,7 +246,10 @@ mod cpal {
         resampler: Option<Resampler<T>>,
     }
 
-    impl<T: cpal::SizedSample + AudioOutputSample> CpalAudioOutputImpl<T> {
+    impl<T: cpal::SizedSample + AudioOutputSample> CpalAudioOutputImpl<T>
+    where
+        f32: cpal::FromSample<T>,
+    {
         pub fn try_open(
             spec: SignalSpec,
             duration: Duration,
@@ -254,8 +264,7 @@ mod cpal {
                     sample_rate: cpal::SampleRate(spec.rate),
                     buffer_size: cpal::BufferSize::Default,
                 }
-            }
-            else {
+            } else {
                 // Use the default config for Windows.
                 device
                     .default_output_config()
@@ -303,18 +312,33 @@ mod cpal {
 
             let resampler = if spec.rate != config.sample_rate.0 {
                 info!("resampling {} Hz to {} Hz", spec.rate, config.sample_rate.0);
-                Some(Resampler::new(spec, config.sample_rate.0 as usize, duration))
-            }
-            else {
+                Some(Resampler::new(
+                    spec,
+                    config.sample_rate.0 as usize,
+                    duration,
+                ))
+            } else {
                 None
             };
 
-            Ok(Box::new(CpalAudioOutputImpl { ring_buf_producer, sample_buf, stream, resampler }))
+            Ok(Box::new(CpalAudioOutputImpl {
+                ring_buf_producer,
+                sample_buf,
+                stream,
+                resampler,
+            }))
         }
     }
 
-    impl<T: AudioOutputSample> AudioOutput for CpalAudioOutputImpl<T> {
-        fn write(&mut self, decoded: AudioBufferRef<'_>) -> Result<()> {
+    impl<T: AudioOutputSample> AudioOutput for CpalAudioOutputImpl<T>
+    where
+        f32: cpal::FromSample<T>,
+    {
+        fn write(
+            &mut self,
+            decoded: AudioBufferRef<'_>,
+            gui_ring_buf_producer: &rb::Producer<f32>,
+        ) -> Result<()> {
             // Do nothing if there are no audio frames.
             if decoded.frames() == 0 {
                 return Ok(());
@@ -327,8 +351,7 @@ mod cpal {
                     Some(resampled) => resampled,
                     None => return Ok(()),
                 }
-            }
-            else {
+            } else {
                 // Resampling is not required. Interleave the sample for cpal using a sample buffer.
                 self.sample_buf.copy_interleaved_ref(decoded);
 
@@ -336,7 +359,11 @@ mod cpal {
             };
 
             // Write all samples to the ring buffer.
-            while let Some(written) = self.ring_buf_producer.write_blocking(samples) {
+            let _written_count_to_scope = gui_ring_buf_producer
+                .write_blocking(&samples.iter().map(|s| s.to_sample()).collect::<Vec<f32>>());
+
+            // Write all samples to the ring buffer.
+            while let Some(written) = self.ring_buf_producer.write_blocking(&samples) {
                 samples = &samples[written..];
             }
 
@@ -360,10 +387,12 @@ mod cpal {
     }
 }
 
+/*
 #[cfg(target_os = "linux")]
 pub fn try_open(spec: SignalSpec, duration: Duration) -> Result<Box<dyn AudioOutput>> {
     pulseaudio::PulseAudioOutput::try_open(spec, duration)
 }
+*/
 
 #[cfg(not(target_os = "linux"))]
 pub fn try_open(spec: SignalSpec, duration: Duration) -> Result<Box<dyn AudioOutput>> {

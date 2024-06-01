@@ -1,6 +1,7 @@
 use library::{Library, LibraryItem, LibraryView};
 use player::Player;
 use playlist::Playlist;
+use rb::Consumer;
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -47,6 +48,12 @@ pub struct App {
     pub library_receiver: Option<Receiver<Library>>,
 
     #[serde(skip_serializing, skip_deserializing)]
+    pub played_audio_buffer: Option<rb::Consumer<f32>>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub scope_buffer: Option<Vec<f32>>,
+
+    #[serde(skip_serializing, skip_deserializing)]
     pub quit: bool,
 }
 
@@ -60,6 +67,8 @@ impl Default for App {
             playlist_idx_to_remove: None,
             library_sender: None,
             library_receiver: None,
+            played_audio_buffer: None,
+            scope_buffer: None,
             quit: false,
         }
     }
