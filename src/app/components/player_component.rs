@@ -20,7 +20,12 @@ impl AppComponent for PlayerComponent {
                 eframe::egui::Slider::new(&mut volume, (0.0 as f32)..=(1.0 as f32))
                     .logarithmic(false)
                     .show_value(true)
-                    .clamp_to_range(true),
+                    .clamp_to_range(true)
+                    .step_by(0.01)
+                    .custom_formatter(|num, _| {
+                       let db = 20.0 * num.log10();
+                       format!("{db:.02}dB")
+                    })
             );
 
             if volume_slider.drag_stopped() {
