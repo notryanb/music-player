@@ -18,6 +18,7 @@ pub trait AudioOutput {
         &mut self,
         decoded: AudioBufferRef<'_>,
         gui_ring_buf_producer: &rb::Producer<f32>,
+        volume: f32,
     ) -> Result<()>;
     fn flush(&mut self);
 }
@@ -192,11 +193,28 @@ mod cpal {
     trait AudioOutputSample:
         cpal::Sample + ConvertibleSample + IntoSample<f32> + RawSample + std::marker::Send + 'static
     {
+        fn mul(&self, n: f32) -> Self;
     }
 
-    impl AudioOutputSample for f32 {}
-    impl AudioOutputSample for i16 {}
-    impl AudioOutputSample for u16 {}
+    impl AudioOutputSample for f32 {
+        fn mul(&self, n: f32) -> Self {
+            self * n
+        }
+    }
+
+    // TODO - I don't think this will actually work as intended due to truncation?
+    impl AudioOutputSample for i16 {
+        fn mul(&self, n: f32) -> Self {
+            (*self as f32 * n) as i16
+        }
+    }
+
+    // TODO - I don't think this will actually work as intended due to truncation?
+    impl AudioOutputSample for u16 {
+        fn mul(&self, n: f32) -> Self {
+            (*self as f32 * n) as u16
+        }
+    }
 
     impl CpalAudioOutput {
         pub fn try_open(spec: SignalSpec, duration: Duration) -> Result<Box<dyn AudioOutput>> {
@@ -282,6 +300,7 @@ mod cpal {
             let stream_result = device.build_output_stream(
                 &config,
                 move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
+                    // let volume = 1.0f32;
                     // Write out as many samples as possible from the ring buffer to the audio
                     // output.
                     let written = ring_buf_consumer.read(data).unwrap_or(0);
@@ -338,6 +357,7 @@ mod cpal {
             &mut self,
             decoded: AudioBufferRef<'_>,
             gui_ring_buf_producer: &rb::Producer<f32>,
+            volume: f32,
         ) -> Result<()> {
             // Do nothing if there are no audio frames.
             if decoded.frames() == 0 {
@@ -359,11 +379,18 @@ mod cpal {
             };
 
             // Write all samples to the ring buffer.
-            let _written_count_to_scope = gui_ring_buf_producer
-                .write_blocking(&samples.iter().map(|s| s.to_sample()).collect::<Vec<f32>>());
+            let _written_count_to_scope = gui_ring_buf_producer.write_blocking(
+                &samples
+                    .iter()
+                    .map(|s| s.to_sample::<f32>())
+                    .collect::<Vec<f32>>(),
+            );
 
             // Write all samples to the ring buffer.
-            while let Some(written) = self.ring_buf_producer.write_blocking(&samples) {
+            while let Some(written) = self
+                .ring_buf_producer
+                .write_blocking(&samples.iter().map(|s| s.mul(volume)).collect::<Vec<_>>())
+            {
                 samples = &samples[written..];
             }
 

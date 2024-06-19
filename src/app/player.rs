@@ -138,9 +138,9 @@ impl Player {
     // TODO - Need to only send message when volume has changed
     pub fn set_volume(&mut self, volume: f32) {
         self.volume = volume;
-        // self.audio_tx
-        //     .send(AudioCommand::SetVolume(volume))
-        //     .expect("Failed to send play to audio thread");
+        self.audio_tx
+            .send(AudioCommand::SetVolume(volume))
+            .expect("Failed to send play to audio thread");
     }
 
     pub fn set_seek_to_timestamp(&mut self, seek_to_timestamp: u64) {

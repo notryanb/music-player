@@ -63,11 +63,11 @@ fn main() {
         };
 
         let mut decoder: Option<Box<dyn symphonia::core::codecs::Decoder>> = None;
-        let mut _volume = 1.0;
+        let mut volume = 1.0;
         let mut current_track_path: Option<PathBuf> = None;
 
         loop {
-            process_audio_cmd(&audio_rx, &mut state);
+            process_audio_cmd(&audio_rx, &mut state, &mut volume);
 
             match state {
                 PlayerState::Playing => {
@@ -131,7 +131,7 @@ fn main() {
                                 if packet.ts() >= play_opts.seek_ts {
                                     if let Some(audio_output) = audio_output {
                                         audio_output
-                                            .write(decoded, &gui_ring_buf_producer)
+                                            .write(decoded, &gui_ring_buf_producer, volume)
                                             .unwrap();
                                     }
                                 }
@@ -222,7 +222,7 @@ fn main() {
         .expect("eframe failed: I should change main to return a result and use anyhow");
 }
 
-fn process_audio_cmd(audio_rx: &Receiver<AudioCommand>, state: &mut PlayerState) {
+fn process_audio_cmd(audio_rx: &Receiver<AudioCommand>, state: &mut PlayerState, volume: &mut f32) {
     match audio_rx.try_recv() {
         Ok(cmd) => {
             //Process Start
@@ -246,6 +246,10 @@ fn process_audio_cmd(audio_rx: &Receiver<AudioCommand>, state: &mut PlayerState)
                 AudioCommand::LoadFile(path) => {
                     tracing::info!("Processing LOAD FILE command for path: {:?}", &path);
                     *state = PlayerState::LoadFile(path);
+                }
+                AudioCommand::SetVolume(vol) => {
+                    tracing::info!("Processing SET VOLUME command to: {:?}", &vol);
+                    *volume = vol;
                 }
                 _ => tracing::warn!("Unhandled case in audio command loop"),
             }
