@@ -1,7 +1,7 @@
 use library::{Library, LibraryItem, LibraryView};
 use player::Player;
 use playlist::Playlist;
-use rb::Consumer;
+use scope::Scope;
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -10,6 +10,7 @@ mod components;
 mod library;
 pub mod player;
 mod playlist;
+pub mod scope;
 
 pub enum AudioCommand {
     Stop,
@@ -51,7 +52,7 @@ pub struct App {
     pub played_audio_buffer: Option<rb::Consumer<f32>>,
 
     #[serde(skip_serializing, skip_deserializing)]
-    pub scope_buffer: Option<Vec<f32>>,
+    pub scope: Option<Scope>,
 
     #[serde(skip_serializing, skip_deserializing)]
     pub quit: bool,
@@ -68,7 +69,7 @@ impl Default for App {
             library_sender: None,
             library_receiver: None,
             played_audio_buffer: None,
-            scope_buffer: None,
+            scope: Some(Scope::new()),
             quit: false,
         }
     }

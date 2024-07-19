@@ -1,6 +1,7 @@
-pub use crate::app::player::Player;
-pub use crate::app::App;
 pub use crate::app::*;
+pub use crate::app::App;
+pub use crate::app::player::Player;
+pub use crate::app::scope::Scope;
 
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU32;
@@ -42,7 +43,7 @@ fn main() {
 
     // App setup
     let mut app = App::load().unwrap_or_default();
-    app.scope_buffer = Some(vec![0.0f32; 4096]);
+    app.scope = Some(Scope::new());
     app.player = Some(player);
     app.library_sender = Some(tx);
     app.library_receiver = Some(rx);
