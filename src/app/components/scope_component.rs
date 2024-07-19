@@ -32,18 +32,20 @@ impl AppComponent for ScopeComponent {
                     }
                 }
 
+                /*
                 let points: Vec<Pos2> = scope
                     .buffer
                     .iter()
                     .enumerate()
                     .map(|(i, sample)| to_screen * pos2(i as f32 / (48000.0 * 3.0), *sample))
                     .collect();
+                */
 
-                // let points: Vec<Pos2> = scope
-                //     .into_iter()
-                //     .enumerate()
-                //     .map(|(i, sample)| to_screen * pos2(i as f32 / (48000.0 * 3.0), sample))
-                //     .collect();
+                let points: Vec<Pos2> = scope
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, sample)| to_screen * pos2(i as f32 / (48000.0 * 3.0), sample))
+                    .collect();
 
 
                 shapes.push(crate::egui::epaint::Shape::line(

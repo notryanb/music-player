@@ -1,38 +1,64 @@
 
 pub struct Scope {
-    pub sample_idx: usize,
-    pub display_idx: isize,
+    pub write_idx: usize,
     pub buffer: Vec<f32>,
 }
 
 impl Scope {
     pub fn new() -> Self {
         Self {
-            sample_idx: 0,
-            display_idx: 0,
+            write_idx: 0,
             buffer: vec![0.0f32; 48000 * 3],
         }
     }
 
     pub fn write_sample(&mut self, sample: f32) {
-        if self.sample_idx >= self.buffer.len() {
-            self.sample_idx -= self.buffer.len();
+        if self.write_idx >= self.buffer.len() {
+            self.write_idx -= self.buffer.len();
         }
 
-        self.buffer[self.sample_idx] = sample;
-        self.sample_idx += 1;
+        self.buffer[self.write_idx] = sample;
+        self.write_idx += 1;
     }
 }
 
-// impl Iterator for Scope {
-//     type Item = f32;
-    
-//     fn next(&mut self) -> Option<Self::Item> {
-//         if self.display_idx >= self.buffer.len() as isize {
-//             return None;
-//         }
+impl<'a> IntoIterator for &'a Scope {
+    type Item = f32;
+    type IntoIter = ScopeIterator<'a>;
 
-//         self.display_idx += 1;
-//         Some(self.buffer[(self.display_idx - 1) as usize])
-//     }    
-// }
+    fn into_iter(self) -> Self::IntoIter {
+        let mut index = self.write_idx + 1;
+
+        if &index >= &self.buffer.len() {
+            index -= &self.buffer.len();
+        }
+
+        ScopeIterator {
+            scope: self,
+            index,
+        }
+    }
+}
+pub struct ScopeIterator<'a> {
+    scope: &'a Scope,
+    index: usize,
+}
+
+impl<'a> Iterator for ScopeIterator<'a> {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let buffer = &self.scope.buffer;
+        self.index += 1;
+
+        if self.index >= buffer.len() {
+            self.index -= buffer.len();
+        }
+
+        if self.index == self.scope.write_idx {
+            return None;
+        }
+
+        Some(buffer[self.index]) 
+    }
+}
