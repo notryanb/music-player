@@ -44,6 +44,7 @@ fn main() {
     // App setup
     let mut app = App::load().unwrap_or_default();
     app.scope = Some(Scope::new());
+    app.temp_buf = Some(vec![0.0f32; 4096]);
     app.player = Some(player);
     app.library_sender = Some(tx);
     app.library_receiver = Some(rx);

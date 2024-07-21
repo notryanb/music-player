@@ -53,6 +53,9 @@ pub struct App {
 
     #[serde(skip_serializing, skip_deserializing)]
     pub scope: Option<Scope>,
+    
+    #[serde(skip_serializing, skip_deserializing)]
+    pub temp_buf: Option<Vec<f32>>,
 
     #[serde(skip_serializing, skip_deserializing)]
     pub quit: bool,
@@ -70,6 +73,7 @@ impl Default for App {
             library_receiver: None,
             played_audio_buffer: None,
             scope: Some(Scope::new()),
+            temp_buf: Some(vec![0.0f32; 4096]),
             quit: false,
         }
     }

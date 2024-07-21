@@ -20,6 +20,24 @@ impl Scope {
         self.buffer[self.write_idx] = sample;
         self.write_idx += 1;
     }
+
+    pub fn write_samples(&mut self, samples: &[f32]) {
+        // if slice can fit from write pointer to end, then write all at once.
+        // Otherwise, write from write idx to end of buf.
+        // then update write idx to beginning and write the remaining of slice.
+        if samples.len() > 0 && samples.len() <= self.buffer.len() - self.write_idx {
+            self.buffer[self.write_idx..(samples.len() + self.write_idx)].copy_from_slice(&samples);
+            self.write_idx += samples.len();
+        } else {
+            let remaining = self.buffer.len() - self.write_idx;
+            //tracing::info!("remaining: {}, write_idx: {}", remaining, self.write_idx);
+            self.buffer[self.write_idx..].copy_from_slice(&samples[..remaining]);
+            //self.write_idx -= self.buffer.len();
+            self.write_idx= 0;
+            //tracing::info!("remaining: {}, write_idx: {}, sample_len: {}", remaining, self.write_idx, samples.len());
+            self.buffer[self.write_idx..(samples.len() - remaining)].copy_from_slice(&samples[remaining..]);
+        }
+    }
 }
 
 impl<'a> IntoIterator for &'a Scope {
@@ -62,3 +80,4 @@ impl<'a> Iterator for ScopeIterator<'a> {
         Some(buffer[self.index]) 
     }
 }
+

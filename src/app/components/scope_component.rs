@@ -24,11 +24,18 @@ impl AppComponent for ScopeComponent {
             // TODO - Need to figure out how to handle moving the data out of the scope buffer option... This creates redundant code.
             if let Some(ref mut scope) = &mut ctx.scope {
                 if let Some(audio_buf) = &ctx.played_audio_buffer {
-                    let mut local_buf = vec![0.0f32; 4096];
-                    let num_bytes_read = audio_buf.read(&mut local_buf).unwrap_or(0);
+                    if let Some(local_buf) = &mut ctx.temp_buf {
+                        let num_bytes_read = audio_buf.read(&mut local_buf[..]).unwrap_or(0);
 
-                    for sample in (&local_buf[0..num_bytes_read]).iter().step_by(2) {
-                        scope.write_sample(*sample);
+                        if num_bytes_read > 0 {
+                            /*
+                            scope.write_samples(&local_buf[0..num_bytes_read]);
+                            */
+
+                            for sample in (local_buf[0..num_bytes_read]).iter().step_by(2) {
+                                scope.write_sample(*sample);
+                            }
+                        }
                     }
                 }
 
@@ -46,7 +53,6 @@ impl AppComponent for ScopeComponent {
                     .enumerate()
                     .map(|(i, sample)| to_screen * pos2(i as f32 / (48000.0 * 3.0), sample))
                     .collect();
-
 
                 shapes.push(crate::egui::epaint::Shape::line(
                     points,

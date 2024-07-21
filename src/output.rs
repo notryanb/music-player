@@ -379,7 +379,7 @@ mod cpal {
             };
 
             // Write all samples to the ring buffer.
-            let _written_count_to_scope = gui_ring_buf_producer.write_blocking(
+            let _written_count_to_scope = gui_ring_buf_producer.write(
                 &samples
                     .iter()
                     .map(|s| s.to_sample::<f32>())
