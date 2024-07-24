@@ -374,12 +374,11 @@ mod cpal {
             } else {
                 // Resampling is not required. Interleave the sample for cpal using a sample buffer.
                 self.sample_buf.copy_interleaved_ref(decoded);
-
                 self.sample_buf.samples()
             };
 
             // Write all samples to the ring buffer.
-            let _written_count_to_scope = gui_ring_buf_producer.write_blocking(
+            let _written_count_to_scope = gui_ring_buf_producer.write(
                 &samples
                     .iter()
                     .map(|s| s.to_sample::<f32>())
