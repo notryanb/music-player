@@ -21,32 +21,18 @@ impl AppComponent for ScopeComponent {
                 emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, -1.0..=1.0), rect);
             let mut shapes = vec![];
 
-            // TODO - Need to figure out how to handle moving the data out of the scope buffer option... This creates redundant code.
             if let Some(ref mut scope) = &mut ctx.scope {
                 if let Some(audio_buf) = &ctx.played_audio_buffer {
                     if let Some(local_buf) = &mut ctx.temp_buf {
                         let num_bytes_read = audio_buf.read(&mut local_buf[..]).unwrap_or(0);
 
                         if num_bytes_read > 0 {
-                            /*
-                            scope.write_samples(&local_buf[0..num_bytes_read]);
-                            */
-
                             for sample in (local_buf[0..num_bytes_read]).iter().step_by(2) {
                                 scope.write_sample(*sample);
                             }
                         }
                     }
                 }
-
-                /*
-                let points: Vec<Pos2> = scope
-                    .buffer
-                    .iter()
-                    .enumerate()
-                    .map(|(i, sample)| to_screen * pos2(i as f32 / (48000.0 * 3.0), *sample))
-                    .collect();
-                */
 
                 let points: Vec<Pos2> = scope
                     .into_iter()

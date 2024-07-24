@@ -374,7 +374,6 @@ mod cpal {
             } else {
                 // Resampling is not required. Interleave the sample for cpal using a sample buffer.
                 self.sample_buf.copy_interleaved_ref(decoded);
-
                 self.sample_buf.samples()
             };
 

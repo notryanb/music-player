@@ -30,11 +30,8 @@ impl Scope {
             self.write_idx += samples.len();
         } else {
             let remaining = self.buffer.len() - self.write_idx;
-            //tracing::info!("remaining: {}, write_idx: {}", remaining, self.write_idx);
             self.buffer[self.write_idx..].copy_from_slice(&samples[..remaining]);
-            //self.write_idx -= self.buffer.len();
             self.write_idx= 0;
-            //tracing::info!("remaining: {}, write_idx: {}, sample_len: {}", remaining, self.write_idx, samples.len());
             self.buffer[self.write_idx..(samples.len() - remaining)].copy_from_slice(&samples[remaining..]);
         }
     }
@@ -54,30 +51,33 @@ impl<'a> IntoIterator for &'a Scope {
         ScopeIterator {
             scope: self,
             index,
+            counter: 0,
         }
     }
 }
 pub struct ScopeIterator<'a> {
     scope: &'a Scope,
     index: usize,
+    counter: usize,
 }
 
 impl<'a> Iterator for ScopeIterator<'a> {
     type Item = f32;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let buffer = &self.scope.buffer;
         self.index += 1;
+        self.counter += 1;
 
-        if self.index >= buffer.len() {
-            self.index -= buffer.len();
+        if self.index >= self.scope.buffer.len() {
+            self.index -= self.scope.buffer.len();
         }
 
-        if self.index == self.scope.write_idx {
+        // I bet this is the cause of the issue. Entering an infinite loop
+        if self.index == self.scope.write_idx || self.counter > self.scope.buffer.len() {
             return None;
         }
 
-        Some(buffer[self.index]) 
+        Some(self.scope.buffer[self.index]) 
     }
 }
 
