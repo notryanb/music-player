@@ -5,10 +5,11 @@ pub struct Scope {
 }
 
 impl Scope {
+    // TODO - take in ms and figure out buffer size
     pub fn new() -> Self {
         Self {
             write_idx: 0,
-            buffer: vec![0.0f32; 48000 * 3],
+            buffer: vec![0.0f32; 48000 * 1],
         }
     }
 

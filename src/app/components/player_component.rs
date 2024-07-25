@@ -41,6 +41,7 @@ impl AppComponent for PlayerComponent {
                         seek_to_timestamp = seek_timestamp;
                     }
                     UiCommand::TotalTrackDuration(dur) => {
+                        tracing::info!("Received Duration: {}", dur);
                         duration = dur;
                         ctx.player.as_mut().unwrap().set_duration(dur);
                     }
@@ -56,6 +57,8 @@ impl AppComponent for PlayerComponent {
             }
 
             // Time Slider
+            // TODO - use custom_formatter to maybe turn the duration/timestamp into a
+            // hr:min:seconds:ms display?
             let time_slider = ui.add(
                 eframe::egui::Slider::new(&mut seek_to_timestamp, 0..=duration)
                     .logarithmic(false)
@@ -71,7 +74,6 @@ impl AppComponent for PlayerComponent {
                 .set_seek_to_timestamp(seek_to_timestamp);
 
             if time_slider.drag_stopped() {
-                tracing::info!("Trying to seek to {seek_to_timestamp}");
                 ctx.player.as_mut().unwrap().seek_to(seek_to_timestamp);
             }
 

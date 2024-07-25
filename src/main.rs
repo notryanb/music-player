@@ -44,7 +44,7 @@ fn main() {
     // App setup
     let mut app = App::load().unwrap_or_default();
     app.scope = Some(Scope::new());
-    app.temp_buf = Some(vec![0.0f32; 4096]);
+    app.temp_buf = Some(vec![0.0f32; 48000]);
     app.player = Some(player);
     app.library_sender = Some(tx);
     app.library_receiver = Some(rx);
@@ -67,6 +67,7 @@ fn main() {
         let mut decoder: Option<Box<dyn symphonia::core::codecs::Decoder>> = None;
         let mut volume = 1.0;
         let mut current_track_path: Option<PathBuf> = None;
+        let mut timer = std::time::Instant::now();
 
         loop {
             process_audio_cmd(&audio_rx, &mut state, &mut volume);
@@ -104,9 +105,15 @@ fn main() {
                             break 'once Ok(());
                         }
 
-                        ui_tx
-                            .send(UiCommand::CurrentTimestamp(packet.ts))
-                            .expect("Failed to send play to ui thread");
+                        if timer.elapsed() > std::time::Duration::from_millis(500) {
+                            // Sending the timestamp every possible read spams the UI queue.
+                            // We only need to send this data twice a second or so...
+                            ui_tx
+                                .send(UiCommand::CurrentTimestamp(packet.ts))
+                                .expect("Failed to send play to ui thread");
+
+                            timer = std::time::Instant::now();
+                        }
 
                         // Decode the packet into audio samples.
                         match decoder.as_mut().unwrap().decode(&packet) {
@@ -182,6 +189,11 @@ fn main() {
                             &mut decoder,
                             0,
                         );
+
+                        ui_tx
+                            .send(UiCommand::CurrentTimestamp(0))
+                            .expect("Failed to send play to ui thread");
+
                         state = PlayerState::Unstarted;
                     }
                 }
