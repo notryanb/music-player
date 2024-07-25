@@ -160,14 +160,30 @@ fn main() {
                     _ = do_verification(decoder.as_mut().unwrap().finalize());
                 }
                 PlayerState::Stopped => {
-                    // Flush the audio buffer and reset the cpal audio context, which gets reconfigured on the next file loaded.
+                    // This is kind of a hack to get stopping to work. Flush the buffer so there is
+                    // nothing left in the resampler, but the decoder needs to be reset. This is as
+                    // simple as reloading the current track so the next time it plays from the
+                    // beginning.
                     if let Some(audio_output) = audio_engine_state.audio_output.as_mut() {
                         tracing::info!("Audio Thread Stopped - flushing output");
                         audio_output.flush()
                     }
 
-                    audio_engine_state.audio_output = None;
-                    state = PlayerState::Stopped;
+                    if let Some(ref current_track_path) = current_track_path {
+                        if let Some(audio_output) = audio_engine_state.audio_output.as_mut() {
+                            audio_output.flush()
+                        }
+
+                        audio_engine_state.audio_output = None;
+
+                        load_file(
+                            current_track_path,
+                            &mut audio_engine_state,
+                            &mut decoder,
+                            0,
+                        );
+                        state = PlayerState::Unstarted;
+                    }
                 }
                 PlayerState::SeekTo(seek_timestamp) => {
                     tracing::info!("AudioThread Seeking");
