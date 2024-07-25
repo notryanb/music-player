@@ -28,7 +28,7 @@ impl AppComponent for PlayerComponent {
                     })
             );
 
-            if volume_slider.drag_stopped() {
+            if volume_slider.dragged() {
                 ctx.player.as_mut().unwrap().set_volume(volume);
             }
 
