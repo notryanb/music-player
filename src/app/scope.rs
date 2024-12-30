@@ -1,4 +1,3 @@
-
 pub struct Scope {
     pub write_idx: usize,
     pub buffer: Vec<f32>,
@@ -32,8 +31,9 @@ impl Scope {
         } else {
             let remaining = self.buffer.len() - self.write_idx;
             self.buffer[self.write_idx..].copy_from_slice(&samples[..remaining]);
-            self.write_idx= 0;
-            self.buffer[self.write_idx..(samples.len() - remaining)].copy_from_slice(&samples[remaining..]);
+            self.write_idx = 0;
+            self.buffer[self.write_idx..(samples.len() - remaining)]
+                .copy_from_slice(&samples[remaining..]);
         }
     }
 }
@@ -78,7 +78,6 @@ impl<'a> Iterator for ScopeIterator<'a> {
             return None;
         }
 
-        Some(self.scope.buffer[self.index]) 
+        Some(self.scope.buffer[self.index])
     }
 }
-

@@ -28,6 +28,7 @@ fn main() {
     tracing::info!("App booting...");
 
     let (tx, rx) = channel();
+    let (tx2, rx2) = channel();
     let (audio_tx, audio_rx) = channel();
     let (ui_tx, ui_rx) = channel();
     let cursor = Arc::new(AtomicU32::new(0));
@@ -47,8 +48,10 @@ fn main() {
     app.scope = Some(Scope::new());
     app.temp_buf = Some(vec![0.0f32; 48000]);
     app.player = Some(player);
-    app.library_sender = Some(tx);
-    app.library_receiver = Some(rx);
+    app.library_view_tx = Some(tx);
+    app.library_view_rx = Some(rx);
+    app.library_item_tx = Some(tx2);
+    app.library_item_rx = Some(rx2);
     app.played_audio_buffer = Some(gui_ring_buf_consumer);
     app.is_processing_ui_change = Some(is_processing_ui_change.clone());
 

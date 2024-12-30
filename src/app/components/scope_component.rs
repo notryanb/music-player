@@ -44,7 +44,7 @@ impl AppComponent for ScopeComponent {
                     points,
                     crate::egui::epaint::Stroke::new(1.0, color),
                 ));
-            } 
+            }
 
             ui.painter().extend(shapes);
         });

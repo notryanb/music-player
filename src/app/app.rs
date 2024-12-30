@@ -13,17 +13,26 @@ impl eframe::App for App {
         self.save_state();
     }
 
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if self.quit {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
 
         ctx.request_repaint();
 
-        if let Some(rx) = &self.library_receiver {
+        if let Some(rx) = &self.library_item_rx {
             match rx.try_recv() {
-                Ok(library) => {
-                    self.library = Some(library);
+                Ok(lib_item) => {
+                    self.library.add_item(lib_item);
+                }
+                Err(_) => (),
+            }
+        }
+
+        if let Some(rx) = &self.library_view_rx {
+            match rx.try_recv() {
+                Ok(lib_view) => {
+                    self.library.add_view(lib_view);
                 }
                 Err(_) => (),
             }

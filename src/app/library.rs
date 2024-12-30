@@ -1,17 +1,18 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Library {
-    root_path: PathBuf,
+    paths: HashSet<PathBuf>,
     items: Vec<LibraryItem>,
     library_view: LibraryView,
 }
 
 impl Library {
-    pub fn new(root_path: PathBuf) -> Self {
+    pub fn new() -> Self {
         Self {
-            root_path,
+            paths: HashSet::new(),
             items: Vec::new(),
             library_view: LibraryView {
                 view_type: ViewType::Album,
@@ -20,16 +21,23 @@ impl Library {
         }
     }
 
-    pub fn root_path(&self) -> PathBuf {
-        self.root_path.clone()
+    pub fn paths(&self) -> &HashSet<PathBuf> {
+        &self.paths
     }
 
-    pub fn items(&self) -> Vec<LibraryItem> {
-        self.items.clone()
+    // TODO - This should potentially be a result and checks if the path really exists on the system?
+    // A library path could also have state which holds the PathBuf and validity, so that can be reported in the UI
+    // if a user ever removes it from the drive after it has been added to the library.
+    pub fn add_path(&mut self, path: PathBuf) -> bool {
+        self.paths.insert(path)
     }
 
-    pub fn view(&self) -> LibraryView {
-        self.library_view.clone()
+    pub fn items(&self) -> &Vec<LibraryItem> {
+        self.items.as_ref()
+    }
+
+    pub fn view(&self) -> &LibraryView {
+        &self.library_view
     }
 
     pub fn add_item(&mut self, library_item: LibraryItem) {
@@ -55,7 +63,7 @@ pub struct LibraryItem {
 
 impl LibraryItem {
     pub fn new(path: PathBuf) -> Self {
-        use rand::Rng;
+        use rand::Rng; // TODO - use ULID?
         Self {
             path,
             title: None,

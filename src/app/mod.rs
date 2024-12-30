@@ -32,7 +32,7 @@ pub enum UiCommand {
 
 #[derive(Serialize, Deserialize)]
 pub struct App {
-    pub library: Option<Library>,
+    pub library: Library,
 
     pub playlists: Vec<Playlist>,
 
@@ -45,10 +45,16 @@ pub struct App {
     pub playlist_idx_to_remove: Option<usize>,
 
     #[serde(skip_serializing, skip_deserializing)]
-    pub library_sender: Option<Sender<Library>>,
+    pub library_view_tx: Option<Sender<LibraryView>>,
 
     #[serde(skip_serializing, skip_deserializing)]
-    pub library_receiver: Option<Receiver<Library>>,
+    pub library_view_rx: Option<Receiver<LibraryView>>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub library_item_tx: Option<Sender<LibraryItem>>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub library_item_rx: Option<Receiver<LibraryItem>>,
 
     #[serde(skip_serializing, skip_deserializing)]
     pub played_audio_buffer: Option<rb::Consumer<f32>>,
@@ -69,13 +75,15 @@ pub struct App {
 impl Default for App {
     fn default() -> Self {
         Self {
-            library: None,
+            library: Library::new(),
             playlists: vec![],
             current_playlist_idx: None,
             player: None,
             playlist_idx_to_remove: None,
-            library_sender: None,
-            library_receiver: None,
+            library_view_tx: None,
+            library_view_rx: None,
+            library_item_tx: None,
+            library_item_rx: None,
             played_audio_buffer: None,
             scope: Some(Scope::new()),
             temp_buf: Some(vec![0.0f32; 4096]),
