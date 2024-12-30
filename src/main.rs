@@ -1,10 +1,10 @@
-pub use crate::app::*;
-pub use crate::app::App;
 pub use crate::app::player::Player;
 pub use crate::app::scope::Scope;
+pub use crate::app::App;
+pub use crate::app::*;
 
 use std::path::PathBuf;
-use std::sync::atomic::AtomicU32;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::thread;
@@ -42,6 +42,7 @@ fn main() {
         (gui_ring_buf.producer(), gui_ring_buf.consumer());
 
     // App setup
+    let is_processing_ui_change = Arc::new(AtomicBool::new(false));
     let mut app = App::load().unwrap_or_default();
     app.scope = Some(Scope::new());
     app.temp_buf = Some(vec![0.0f32; 48000]);
@@ -49,6 +50,7 @@ fn main() {
     app.library_sender = Some(tx);
     app.library_receiver = Some(rx);
     app.played_audio_buffer = Some(gui_ring_buf_consumer);
+    app.is_processing_ui_change = Some(is_processing_ui_change.clone());
 
     // Audio output setup
     let _audio_thread = thread::spawn(move || {
@@ -70,7 +72,7 @@ fn main() {
         let mut timer = std::time::Instant::now();
 
         loop {
-            process_audio_cmd(&audio_rx, &mut state, &mut volume);
+            process_audio_cmd(&audio_rx, &mut state, &mut volume, &is_processing_ui_change);
 
             match state {
                 PlayerState::Playing => {
@@ -183,12 +185,7 @@ fn main() {
 
                         audio_engine_state.audio_output = None;
 
-                        load_file(
-                            current_track_path,
-                            &mut audio_engine_state,
-                            &mut decoder,
-                            0,
-                        );
+                        load_file(current_track_path, &mut audio_engine_state, &mut decoder, 0);
 
                         ui_tx
                             .send(UiCommand::CurrentTimestamp(0))
@@ -252,7 +249,12 @@ fn main() {
         .expect("eframe failed: I should change main to return a result and use anyhow");
 }
 
-fn process_audio_cmd(audio_rx: &Receiver<AudioCommand>, state: &mut PlayerState, volume: &mut f32) {
+fn process_audio_cmd(
+    audio_rx: &Receiver<AudioCommand>,
+    state: &mut PlayerState,
+    volume: &mut f32,
+    is_processing_ui_change: &Arc<AtomicBool>,
+) {
     match audio_rx.try_recv() {
         Ok(cmd) => {
             //Process Start
@@ -280,6 +282,7 @@ fn process_audio_cmd(audio_rx: &Receiver<AudioCommand>, state: &mut PlayerState,
                 AudioCommand::SetVolume(vol) => {
                     tracing::info!("Processing SET VOLUME command to: {:?}", &vol);
                     *volume = vol;
+                    is_processing_ui_change.store(false, Ordering::Relaxed);
                 }
                 _ => tracing::warn!("Unhandled case in audio command loop"),
             }

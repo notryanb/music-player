@@ -23,13 +23,18 @@ impl AppComponent for PlayerComponent {
                     .clamp_to_range(true)
                     .step_by(0.01)
                     .custom_formatter(|num, _| {
-                       let db = 20.0 * num.log10();
-                       format!("{db:.02}dB")
-                    })
+                        let db = 20.0 * num.log10();
+                        format!("{db:.02}dB")
+                    }),
             );
 
             if volume_slider.dragged() {
-                ctx.player.as_mut().unwrap().set_volume(volume);
+                if let Some(is_processing_ui_change) = &ctx.is_processing_ui_change {
+                    ctx.player
+                        .as_mut()
+                        .unwrap()
+                        .set_volume(volume, is_processing_ui_change);
+                }
             }
 
             let mut seek_to_timestamp = ctx.player.as_ref().unwrap().seek_to_timestamp;

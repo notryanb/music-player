@@ -3,7 +3,9 @@ use player::Player;
 use playlist::Playlist;
 use scope::Scope;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{Receiver, Sender};
+use std::sync::Arc;
 
 mod app;
 mod components;
@@ -53,12 +55,15 @@ pub struct App {
 
     #[serde(skip_serializing, skip_deserializing)]
     pub scope: Option<Scope>,
-    
+
     #[serde(skip_serializing, skip_deserializing)]
     pub temp_buf: Option<Vec<f32>>,
 
     #[serde(skip_serializing, skip_deserializing)]
     pub quit: bool,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub is_processing_ui_change: Option<Arc<AtomicBool>>,
 }
 
 impl Default for App {
@@ -75,6 +80,7 @@ impl Default for App {
             scope: Some(Scope::new()),
             temp_buf: Some(vec![0.0f32; 4096]),
             quit: false,
+            is_processing_ui_change: None,
         }
     }
 }

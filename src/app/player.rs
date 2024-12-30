@@ -1,7 +1,7 @@
 use crate::app::library::LibraryItem;
 use crate::app::playlist::Playlist;
 use crate::{AudioCommand, UiCommand};
-use std::sync::atomic::AtomicU32;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
 
@@ -136,11 +136,14 @@ impl Player {
     }
 
     // TODO - Need to only send message when volume has changed
-    pub fn set_volume(&mut self, volume: f32) {
-        self.volume = volume;
-        self.audio_tx
-            .send(AudioCommand::SetVolume(volume))
-            .expect("Failed to send play to audio thread");
+    pub fn set_volume(&mut self, volume: f32, is_processing_ui_change: &Arc<AtomicBool>) {
+        if !is_processing_ui_change.load(Ordering::Acquire) {
+            is_processing_ui_change.store(true, Ordering::Release);
+            self.volume = volume;
+            self.audio_tx
+                .send(AudioCommand::SetVolume(volume))
+                .expect("Failed to send play to audio thread");
+        }
     }
 
     pub fn set_seek_to_timestamp(&mut self, seek_to_timestamp: u64) {
