@@ -1,5 +1,6 @@
 use super::AppComponent;
-use crate::app::{App, Playlist};
+
+use crate::app::{library::LibraryPathStatus, App, Playlist};
 
 pub struct MenuBar;
 
@@ -90,12 +91,76 @@ impl AppComponent for MenuBar {
             });
 
             ui.menu_button("Library", |ui| {
-                let _cgf_btn = ui.button("Configure");
+                let cfg_btn = ui.button("Configure");
+
+                if cfg_btn.clicked() {
+                    ctx.is_library_cfg_open = true;
+                };
             });
 
             ui.menu_button("Help", |ui| {
                 let _about_btn = ui.button("About");
             });
+
+            if ctx.is_library_cfg_open {
+                // Open a window
+                eframe::egui::Window::new("Library Configuration")
+                    .default_width(320.0)
+                    .default_height(400.0)
+                    .resizable([true, true])
+                    .show(ui.ctx(), |ui| {
+                        eframe::egui::Grid::new("Library Paths")
+                            .striped(true)
+                            .min_col_width(25.)
+                            .show(ui, |ui| {
+                                // Header
+                                ui.label("Path");
+                                ui.label("Status");
+                                ui.end_row();
+
+                                for path in ctx.library.paths().iter() {
+                                    ui.label(
+                                        path.path()
+                                            .clone()
+                                            .into_os_string()
+                                            .into_string()
+                                            .unwrap_or("Could not format path".to_string()),
+                                    );
+                                    ui.label("Status unknown");
+                                    ui.end_row();
+                                }
+                            });
+
+                        ui.separator();
+
+                        // TODO - Add ability to remove a path
+                        // Maybe a path should also have an ID and all imported items are linked to that ID
+                        // So they can be removed?
+
+                        if ui.button("Add path...").clicked() {
+                            if let Some(new_path) = rfd::FileDialog::new().pick_folder() {
+                                ctx.library.add_path(new_path);
+                            }
+                        }
+
+                        if ui.button("Cancel").clicked() {
+                            ctx.is_library_cfg_open = false;
+                        }
+
+                        if ui.button("Save").clicked() {
+                            // TODO - This is where the real import happens...
+                            for lib_path in ctx
+                                .library
+                                .paths()
+                                .iter()
+                                .filter(|p| p.status() == LibraryPathStatus::NotImported)
+                            {
+                                ctx.import_library_paths(lib_path);
+                            }
+                            ctx.is_library_cfg_open = false;
+                        }
+                    });
+            }
         });
     }
 }

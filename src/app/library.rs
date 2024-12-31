@@ -1,10 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Library {
-    paths: HashSet<PathBuf>,
+    paths: Vec<LibraryPath>,
     items: Vec<LibraryItem>,
     library_view: LibraryView,
 }
@@ -12,7 +11,7 @@ pub struct Library {
 impl Library {
     pub fn new() -> Self {
         Self {
-            paths: HashSet::new(),
+            paths: Vec::new(),
             items: Vec::new(),
             library_view: LibraryView {
                 view_type: ViewType::Album,
@@ -21,15 +20,26 @@ impl Library {
         }
     }
 
-    pub fn paths(&self) -> &HashSet<PathBuf> {
+    pub fn paths(&self) -> &Vec<LibraryPath> {
         &self.paths
     }
 
-    // TODO - This should potentially be a result and checks if the path really exists on the system?
-    // A library path could also have state which holds the PathBuf and validity, so that can be reported in the UI
-    // if a user ever removes it from the drive after it has been added to the library.
     pub fn add_path(&mut self, path: PathBuf) -> bool {
-        self.paths.insert(path)
+        if self.paths.iter().any(|p| *p.path() == path) {
+            false
+        } else {
+            let new_path = LibraryPath::new(path);
+            self.paths.push(new_path);
+            true
+        }
+    }
+
+    pub fn set_path_to_imported(&mut self, id: LibraryPathId) {
+        for idx in 0..self.paths.len() {
+            if self.paths[idx].id() == id {
+                self.paths[idx].set_status(LibraryPathStatus::Imported);
+            }
+        }
     }
 
     pub fn items(&self) -> &Vec<LibraryItem> {
@@ -45,8 +55,59 @@ impl Library {
     }
 
     pub fn add_view(&mut self, library_view: LibraryView) {
-        self.library_view = library_view;
+        let mut new = library_view.containers.clone();
+
+        self.library_view.containers.append(&mut new);
     }
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub struct LibraryPath {
+    id: LibraryPathId,
+    path: PathBuf,
+    status: LibraryPathStatus,
+}
+
+impl LibraryPath {
+    pub fn new(path: PathBuf) -> Self {
+        use rand::Rng; // TODO - use ULID?
+        Self {
+            path,
+            status: LibraryPathStatus::NotImported,
+            id: LibraryPathId::new(rand::thread_rng().gen()),
+        }
+    }
+
+    pub fn id(&self) -> LibraryPathId {
+        self.id
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+    pub fn status(&self) -> LibraryPathStatus {
+        self.status
+    }
+
+    pub fn set_status(&mut self, status: LibraryPathStatus) {
+        self.status = status;
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub struct LibraryPathId(usize);
+
+impl LibraryPathId {
+    pub fn new(id: usize) -> Self {
+        Self(id)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub enum LibraryPathStatus {
+    NotImported,
+    Imported,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

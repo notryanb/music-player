@@ -29,6 +29,7 @@ fn main() {
 
     let (tx, rx) = channel();
     let (tx2, rx2) = channel();
+    let (tx3, rx3) = channel();
     let (audio_tx, audio_rx) = channel();
     let (ui_tx, ui_rx) = channel();
     let cursor = Arc::new(AtomicU32::new(0));
@@ -52,6 +53,8 @@ fn main() {
     app.library_view_rx = Some(rx);
     app.library_item_tx = Some(tx2);
     app.library_item_rx = Some(rx2);
+    app.library_path_tx = Some(tx3);
+    app.library_path_rx = Some(rx3);
     app.played_audio_buffer = Some(gui_ring_buf_consumer);
     app.is_processing_ui_change = Some(is_processing_ui_change.clone());
 

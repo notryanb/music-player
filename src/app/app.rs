@@ -29,6 +29,15 @@ impl eframe::App for App {
             }
         }
 
+        if let Some(rx) = &self.library_path_rx {
+            match rx.try_recv() {
+                Ok(path_id) => {
+                    self.library.set_path_to_imported(path_id);
+                }
+                Err(_) => (),
+            }
+        }
+
         if let Some(rx) = &self.library_view_rx {
             match rx.try_recv() {
                 Ok(lib_view) => {
