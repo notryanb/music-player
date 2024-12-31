@@ -168,7 +168,7 @@ impl App {
                         && entry
                             .path()
                             .extension()
-                            .expect("failed to get file extension...")
+                            .unwrap_or(std::ffi::OsStr::new(""))
                             == "mp3"
                 })
                 .collect::<Vec<_>>();
