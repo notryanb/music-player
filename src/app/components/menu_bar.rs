@@ -103,7 +103,7 @@ impl AppComponent for MenuBar {
             });
 
             if ctx.is_library_cfg_open {
-                // Open a window
+                // TODO - Turn this library configuation into a separate component
                 eframe::egui::Window::new("Library Configuration")
                     .default_width(320.0)
                     .default_height(400.0)
@@ -118,6 +118,7 @@ impl AppComponent for MenuBar {
                                 ui.label("Status");
                                 ui.end_row();
 
+                                // Data Rows
                                 for path in ctx.library.paths().iter() {
                                     ui.label(
                                         path.path()
@@ -133,32 +134,34 @@ impl AppComponent for MenuBar {
 
                         ui.separator();
 
-                        // TODO - Add ability to remove a path
-                        // Maybe a path should also have an ID and all imported items are linked to that ID
-                        // So they can be removed?
-
-                        if ui.button("Add path...").clicked() {
-                            if let Some(new_path) = rfd::FileDialog::new().pick_folder() {
-                                ctx.library.add_path(new_path);
+                        ui.horizontal(|ui| {
+                            if ui.button("Add path").clicked() {
+                                if let Some(new_path) = rfd::FileDialog::new().pick_folder() {
+                                    ctx.library.add_path(new_path);
+                                }
                             }
-                        }
 
-                        if ui.button("Cancel").clicked() {
-                            ctx.is_library_cfg_open = false;
-                        }
-
-                        if ui.button("Save").clicked() {
-                            // TODO - This is where the real import happens...
-                            for lib_path in ctx
-                                .library
-                                .paths()
-                                .iter()
-                                .filter(|p| p.status() == LibraryPathStatus::NotImported)
-                            {
-                                ctx.import_library_paths(lib_path);
+                            if ui.button("Remove path").clicked() {
+                                // TODO - Should only appear clickable when a path is selected.
+                                // Will also remove any files in the library with the same LibraryPathId
                             }
-                            ctx.is_library_cfg_open = false;
-                        }
+
+                            if ui.button("Cancel").clicked() {
+                                ctx.is_library_cfg_open = false;
+                            }
+
+                            if ui.button("Save").clicked() {
+                                for lib_path in ctx
+                                    .library
+                                    .paths()
+                                    .iter()
+                                    .filter(|p| p.status() == LibraryPathStatus::NotImported)
+                                {
+                                    ctx.import_library_paths(lib_path);
+                                }
+                                ctx.is_library_cfg_open = false;
+                            }
+                        })
                     });
             }
         });

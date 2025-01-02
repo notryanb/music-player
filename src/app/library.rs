@@ -112,6 +112,7 @@ pub enum LibraryPathStatus {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LibraryItem {
+    library_id: LibraryPathId,
     path: PathBuf,
     title: Option<String>,
     artist: Option<String>,
@@ -123,9 +124,10 @@ pub struct LibraryItem {
 }
 
 impl LibraryItem {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf, library_id: LibraryPathId) -> Self {
         use rand::Rng; // TODO - use ULID?
         Self {
+            library_id,
             path,
             title: None,
             artist: None,

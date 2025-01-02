@@ -179,7 +179,10 @@ impl App {
                     let tag = Tag::read_from_path(&entry.path());
 
                     let library_item = match tag {
-                        Ok(tag) => LibraryItem::new(entry.path().to_path_buf())
+                        Ok(tag) => LibraryItem::new(
+                                entry.path().to_path_buf(),
+                                path_id,
+                            )
                             .set_title(tag.title())
                             .set_artist(tag.artist())
                             .set_album(tag.album())
@@ -188,7 +191,10 @@ impl App {
                             .set_track_number(tag.track()),
                         Err(_err) => {
                             tracing::warn!("Couldn't parse to id3: {:?}", &entry.path());
-                            LibraryItem::new(entry.path().to_path_buf())
+                            LibraryItem::new(
+                                entry.path().to_path_buf(),
+                                path_id,
+                            )
                         }
                     };
 
