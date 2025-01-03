@@ -34,10 +34,47 @@ impl Library {
         }
     }
 
+    pub fn remove_path(&mut self, path_id: LibraryPathId) {
+        // Remove the path from the library path list
+        if let Some(idx) = self.paths.iter().position(|l| l.id() == path_id) {
+            self.paths.remove(idx);
+        }
+
+        // Remove the actual items.
+        while let Some(idx) = self
+            .items
+            .iter()
+            .position(|item| item.library_id() == path_id)
+        {
+            self.items.swap_remove(idx);
+        }
+
+        // Remove the view container items
+        for mut container in &mut self.library_view.containers {
+            while let Some(ct_idx) = container
+                .items
+                .iter()
+                .position(|ci| ci.library_id() == path_id)
+            {
+                container.items.swap_remove(ct_idx);
+            }
+        }
+
+        // Remove the empty containers
+        while let Some(idx) = self
+            .library_view
+            .containers
+            .iter()
+            .position(|ct| ct.items.is_empty())
+        {
+            self.library_view.containers.swap_remove(idx);
+        }
+    }
+
     pub fn set_path_to_imported(&mut self, id: LibraryPathId) {
-        for idx in 0..self.paths.len() {
-            if self.paths[idx].id() == id {
-                self.paths[idx].set_status(LibraryPathStatus::Imported);
+        for path in self.paths.iter_mut() {
+            if path.id() == id {
+                path.set_status(LibraryPathStatus::Imported);
             }
         }
     }
@@ -137,6 +174,10 @@ impl LibraryItem {
             track_number: None,
             key: rand::thread_rng().gen(),
         }
+    }
+
+    pub fn library_id(&self) -> LibraryPathId {
+        self.library_id
     }
 
     pub fn path(&self) -> PathBuf {

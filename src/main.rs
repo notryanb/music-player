@@ -251,8 +251,12 @@ fn main() {
         ..Default::default()
     };
 
-    eframe::run_native("Music Player", native_options, Box::new(|_| Box::new(app)))
-        .expect("eframe failed: I should change main to return a result and use anyhow");
+    eframe::run_native(
+        "Music Player",
+        native_options,
+        Box::new(|_| Ok(Box::new(app))),
+    )
+    .expect("eframe failed: I should change main to return a result and use anyhow");
 }
 
 fn process_audio_cmd(

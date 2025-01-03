@@ -1,6 +1,7 @@
 use super::AppComponent;
 
 use crate::app::{library::LibraryPathStatus, App, Playlist};
+use egui_extras::{Column, TableBuilder};
 
 pub struct MenuBar;
 
@@ -105,30 +106,67 @@ impl AppComponent for MenuBar {
             if ctx.is_library_cfg_open {
                 // TODO - Turn this library configuation into a separate component
                 eframe::egui::Window::new("Library Configuration")
-                    .default_width(320.0)
-                    .default_height(400.0)
+                    .default_width(480.0)
+                    .default_height(600.0)
                     .resizable([true, true])
                     .show(ui.ctx(), |ui| {
-                        eframe::egui::Grid::new("Library Paths")
+                        let available_height = ui.available_height();
+                        let table = TableBuilder::new(ui)
                             .striped(true)
-                            .min_col_width(25.)
-                            .show(ui, |ui| {
-                                // Header
-                                ui.label("Path");
-                                ui.label("Status");
-                                ui.end_row();
+                            .resizable(true)
+                            .cell_layout(eframe::egui::Layout::left_to_right(
+                                eframe::egui::Align::Center,
+                            ))
+                            .column(
+                                // Path
+                                Column::remainder().at_least(40.0).clip(true),
+                            )
+                            .column(Column::remainder()) // State
+                            .sense(eframe::egui::Sense::click())
+                            .min_scrolled_height(0.0)
+                            .max_scroll_height(available_height);
 
-                                // Data Rows
+                        table
+                            .header(20.0, |mut header| {
+                                header.col(|ui| {
+                                    ui.strong("Path");
+                                });
+                                header.col(|ui| {
+                                    ui.strong("Status");
+                                });
+                            })
+                            .body(|mut body| {
                                 for path in ctx.library.paths().iter() {
-                                    ui.label(
-                                        path.path()
-                                            .clone()
-                                            .into_os_string()
-                                            .into_string()
-                                            .unwrap_or("Could not format path".to_string()),
-                                    );
-                                    ui.label("Status unknown");
-                                    ui.end_row();
+                                    body.row(20.0, |mut row| {
+                                        let row_id = path.id();
+                                        row.set_selected(
+                                            ctx.lib_config_selections.contains(&row_id),
+                                        );
+                                        row.col(|ui| {
+                                            ui.label(
+                                                path.path()
+                                                    .clone()
+                                                    .into_os_string()
+                                                    .into_string()
+                                                    .unwrap_or("Could not format path".to_string()),
+                                            );
+                                        });
+
+                                        row.col(|ui| {
+                                            ui.style_mut().wrap_mode =
+                                                Some(eframe::egui::TextWrapMode::Extend);
+                                            ui.label("Status unknown");
+                                        });
+
+                                        // Toggle Row Clicked Status
+                                        if row.response().clicked() {
+                                            if ctx.lib_config_selections.contains(&row_id) {
+                                                ctx.lib_config_selections.remove(&row_id);
+                                            } else {
+                                                ctx.lib_config_selections.insert(row_id);
+                                            }
+                                        }
+                                    })
                                 }
                             });
 
@@ -141,9 +179,14 @@ impl AppComponent for MenuBar {
                                 }
                             }
 
-                            if ui.button("Remove path").clicked() {
+                            if ui.button("Remove selected paths").clicked() {
                                 // TODO - Should only appear clickable when a path is selected.
                                 // Will also remove any files in the library with the same LibraryPathId
+                                if !ctx.lib_config_selections.is_empty() {
+                                    for path_id in ctx.lib_config_selections.iter() {
+                                        ctx.library.remove_path(*path_id);
+                                    }
+                                }
                             }
 
                             if ui.button("Cancel").clicked() {

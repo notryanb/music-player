@@ -83,6 +83,9 @@ pub struct App {
     pub quit: bool,
 
     #[serde(skip_serializing, skip_deserializing)]
+    pub lib_config_selections: std::collections::HashSet<LibraryPathId>,
+
+    #[serde(skip_serializing, skip_deserializing)]
     pub is_library_cfg_open: bool,
 
     #[serde(skip_serializing, skip_deserializing)]
@@ -108,6 +111,7 @@ impl Default for App {
             scope: Some(Scope::new()),
             temp_buf: Some(vec![0.0f32; 4096]),
             quit: false,
+            lib_config_selections: Default::default(),
             is_library_cfg_open: false,
             is_processing_ui_change: None,
         }
@@ -165,11 +169,7 @@ impl App {
                 .skip(1)
                 .filter(|entry| {
                     entry.file_type().is_file()
-                        && entry
-                            .path()
-                            .extension()
-                            .unwrap_or(std::ffi::OsStr::new(""))
-                            == "mp3"
+                        && entry.path().extension().unwrap_or(std::ffi::OsStr::new("")) == "mp3"
                 })
                 .collect::<Vec<_>>();
 
@@ -179,10 +179,7 @@ impl App {
                     let tag = Tag::read_from_path(&entry.path());
 
                     let library_item = match tag {
-                        Ok(tag) => LibraryItem::new(
-                                entry.path().to_path_buf(),
-                                path_id,
-                            )
+                        Ok(tag) => LibraryItem::new(entry.path().to_path_buf(), path_id)
                             .set_title(tag.title())
                             .set_artist(tag.artist())
                             .set_album(tag.album())
@@ -191,10 +188,7 @@ impl App {
                             .set_track_number(tag.track()),
                         Err(_err) => {
                             tracing::warn!("Couldn't parse to id3: {:?}", &entry.path());
-                            LibraryItem::new(
-                                entry.path().to_path_buf(),
-                                path_id,
-                            )
+                            LibraryItem::new(entry.path().to_path_buf(), path_id)
                         }
                     };
 

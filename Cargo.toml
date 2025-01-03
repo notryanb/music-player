@@ -6,7 +6,8 @@ edition = "2021"
 
 [dependencies]
 cpal = "0.15"
-eframe = "0.27.2"
+eframe = "0.28"
+egui_extras = "0.28"
 id3 = "1.13"
 itertools = "0.12"
 rayon = "1.10"
