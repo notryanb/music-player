@@ -50,7 +50,7 @@ impl Library {
         }
 
         // Remove the view container items
-        for mut container in &mut self.library_view.containers {
+        for container in &mut self.library_view.containers {
             while let Some(ct_idx) = container
                 .items
                 .iter()

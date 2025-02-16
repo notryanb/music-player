@@ -38,6 +38,12 @@ pub enum UiCommand {
     CurrentTimestamp(u64),
 }
 
+pub enum LibraryCommand {
+    AddView(LibraryView),
+    AddItem(LibraryItem),
+    AddPathId(LibraryPathId),
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct App {
     pub library: Library,
@@ -53,22 +59,10 @@ pub struct App {
     pub playlist_idx_to_remove: Option<usize>,
 
     #[serde(skip_serializing, skip_deserializing)]
-    pub library_view_tx: Option<Sender<LibraryView>>,
+    pub library_cmd_tx: Option<Sender<LibraryCommand>>,
 
     #[serde(skip_serializing, skip_deserializing)]
-    pub library_view_rx: Option<Receiver<LibraryView>>,
-
-    #[serde(skip_serializing, skip_deserializing)]
-    pub library_item_tx: Option<Sender<LibraryItem>>,
-
-    #[serde(skip_serializing, skip_deserializing)]
-    pub library_item_rx: Option<Receiver<LibraryItem>>,
-
-    #[serde(skip_serializing, skip_deserializing)]
-    pub library_path_tx: Option<Sender<LibraryPathId>>,
-
-    #[serde(skip_serializing, skip_deserializing)]
-    pub library_path_rx: Option<Receiver<LibraryPathId>>,
+    pub library_cmd_rx: Option<Receiver<LibraryCommand>>,
 
     #[serde(skip_serializing, skip_deserializing)]
     pub played_audio_buffer: Option<rb::Consumer<f32>>,
@@ -100,13 +94,8 @@ impl Default for App {
             current_playlist_idx: None,
             player: None,
             playlist_idx_to_remove: None,
-            // TODO - All of these tx/rx are silly. Use an enum which represents a command or fold these all into the app commands
-            library_view_tx: None,
-            library_view_rx: None,
-            library_item_tx: None,
-            library_item_rx: None,
-            library_path_tx: None,
-            library_path_rx: None,
+            library_cmd_tx: None,
+            library_cmd_rx: None,
             played_audio_buffer: None,
             scope: Some(Scope::new()),
             temp_buf: Some(vec![0.0f32; 4096]),
@@ -156,9 +145,7 @@ impl App {
 
         tracing::info!("adding library path...");
 
-        let lib_item_tx = self.library_item_tx.as_ref().unwrap().clone();
-        let lib_view_tx = self.library_view_tx.as_ref().unwrap().clone();
-        let lib_path_tx = self.library_path_tx.as_ref().unwrap().clone();
+        let lib_cmd_tx = self.library_cmd_tx.as_ref().unwrap().clone();
         let path = lib_path.path().clone();
         let path_id = lib_path.id().clone();
 
@@ -200,8 +187,8 @@ impl App {
 
             // Populate the library
             for item in &items {
-                lib_item_tx
-                    .send((*item).clone())
+                lib_cmd_tx
+                    .send(LibraryCommand::AddItem((*item).clone()))
                     .expect("failed to send library item")
             }
 
@@ -230,12 +217,12 @@ impl App {
                 library_view.containers.push(lib_item_container.clone());
             }
 
-            lib_view_tx
-                .send(library_view)
+            lib_cmd_tx
+                .send(LibraryCommand::AddView(library_view))
                 .expect("Failed to send library view");
 
-            lib_path_tx
-                .send(path_id)
+            lib_cmd_tx
+                .send(LibraryCommand::AddPathId(path_id))
                 .expect("Failed to send library view");
             //lib_path.set_imported();
         });

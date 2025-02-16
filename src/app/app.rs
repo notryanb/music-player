@@ -1,6 +1,6 @@
 use eframe::egui;
 
-use super::App;
+use super::{App, LibraryCommand};
 use crate::app::components::{
     footer::Footer, library_component::LibraryComponent, menu_bar::MenuBar,
     player_component::PlayerComponent, playlist_table::PlaylistTable, playlist_tabs::PlaylistTabs,
@@ -20,29 +20,15 @@ impl eframe::App for App {
 
         ctx.request_repaint();
 
-        if let Some(rx) = &self.library_item_rx {
-            match rx.try_recv() {
-                Ok(lib_item) => {
-                    self.library.add_item(lib_item);
-                }
-                Err(_) => (),
-            }
-        }
-
-        if let Some(rx) = &self.library_path_rx {
-            match rx.try_recv() {
-                Ok(path_id) => {
-                    self.library.set_path_to_imported(path_id);
-                }
-                Err(_) => (),
-            }
-        }
-
-        if let Some(rx) = &self.library_view_rx {
-            match rx.try_recv() {
-                Ok(lib_view) => {
-                    self.library.add_view(lib_view);
-                }
+        if let Some(lib_cmd_rx) = &self.library_cmd_rx {
+            match lib_cmd_rx.try_recv() {
+                Ok(lib_cmd) => match lib_cmd {
+                    LibraryCommand::AddItem(lib_item) => self.library.add_item(lib_item),
+                    LibraryCommand::AddView(lib_view) => self.library.add_view(lib_view),
+                    LibraryCommand::AddPathId(path_id) => {
+                        self.library.set_path_to_imported(path_id)
+                    }
+                },
                 Err(_) => (),
             }
         }

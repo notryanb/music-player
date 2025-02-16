@@ -16,6 +16,8 @@ impl AppComponent for PlayerComponent {
             let next_btn = ui.button("▶|");
 
             let mut volume = ctx.player.as_ref().unwrap().volume;
+            let previous_vol = volume;
+
             let volume_slider = ui.add(
                 eframe::egui::Slider::new(&mut volume, (0.0 as f32)..=(1.0 as f32))
                     .logarithmic(false)
@@ -30,10 +32,13 @@ impl AppComponent for PlayerComponent {
 
             if volume_slider.dragged() {
                 if let Some(is_processing_ui_change) = &ctx.is_processing_ui_change {
-                    ctx.player
-                        .as_mut()
-                        .unwrap()
-                        .set_volume(volume, is_processing_ui_change);
+                    // Only send if the volume is actually changing
+                    if volume != previous_vol {
+                        ctx.player
+                            .as_mut()
+                            .unwrap()
+                            .set_volume(volume, is_processing_ui_change);
+                    }
                 }
             }
 
