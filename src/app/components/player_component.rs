@@ -115,16 +115,28 @@ impl AppComponent for PlayerComponent {
                 }
             }
 
-            if duration > 0 {
-                let duration_total_secs = duration as f32 / 1000.0 / 60.0;
-                let duration_total_min = (duration_total_secs / 60.0).floor() as u32;
-                let duration_leftover_secs = (duration_total_secs.floor() as u32 - duration_total_min) % 60;
-                if duration_leftover_secs < 10 {
-                    ui.label(format!("0:00 / {}:0{}", duration_total_min, duration_leftover_secs));
-                } else {
-                    ui.label(format!("0:00 / {}:{}", duration_total_min, duration_leftover_secs));
-                }
-            }
+            let TimeParts { hours: _duration_hours, minutes: duration_minutes, seconds: duration_seconds } = time_parts_from_duration(duration);
+            let TimeParts { hours: _current_hours, minutes: current_minutes, seconds: current_seconds } = time_parts_from_duration(seek_to_timestamp);
+            ui.label(format!("{:01}:{:02} / {:01}:{:02}", current_minutes, current_seconds, duration_minutes, duration_seconds));
         });
+    }
+}
+
+struct TimeParts {
+    pub hours: u32,
+    pub minutes: u32,
+    pub seconds: u32,
+}
+
+fn time_parts_from_duration(duration: u64) -> TimeParts {
+    let duration_total_secs = duration as f32 / 1000.0 / 60.0;
+    let duration_total_min = (duration_total_secs / 60.0).floor();
+    let duration_total_hours = (duration_total_min / 60.0).floor();
+    let duration_leftover_secs = (duration_total_secs.floor() - duration_total_min) as u32 % 60;
+
+    TimeParts {
+        hours: duration_total_hours as u32,
+        minutes: duration_total_min as u32,
+        seconds: duration_leftover_secs,    
     }
 }
