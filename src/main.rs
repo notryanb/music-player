@@ -107,7 +107,7 @@ fn main() {
                             break 'once Ok(());
                         }
 
-                        if timer.elapsed() > std::time::Duration::from_millis(500) {
+                        if timer.elapsed() > std::time::Duration::from_millis(250) {
                             // Sending the timestamp every possible read spams the UI queue.
                             // We only need to send this data twice a second or so...
                             ui_tx
