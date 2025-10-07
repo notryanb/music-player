@@ -114,6 +114,17 @@ impl AppComponent for PlayerComponent {
                         .next(&ctx.playlists[(ctx.current_playlist_idx).unwrap()]);
                 }
             }
+
+            if duration > 0 {
+                let duration_total_secs = duration as f32 / 1000.0 / 60.0;
+                let duration_total_min = (duration_total_secs / 60.0).floor() as u32;
+                let duration_leftover_secs = (duration_total_secs.floor() as u32 - duration_total_min) % 60;
+                if duration_leftover_secs < 10 {
+                    ui.label(format!("0:00 / {}:0{}", duration_total_min, duration_leftover_secs));
+                } else {
+                    ui.label(format!("0:00 / {}:{}", duration_total_min, duration_leftover_secs));
+                }
+            }
         });
     }
 }
