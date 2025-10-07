@@ -64,6 +64,7 @@ fn main() {
             decode_opts: None,
             track_info: None,
             duration: 0,
+            sample_rate: 44100.0,
         };
 
         let mut decoder: Option<Box<dyn symphonia::core::codecs::Decoder>> = None;
@@ -225,9 +226,13 @@ fn main() {
 
                     current_track_path = Some((*path).clone());
                     load_file(path, &mut audio_engine_state, &mut decoder, 0);
-                    // TODO - Get total u64 track duration and send to Ui
+
                     ui_tx
                         .send(UiCommand::TotalTrackDuration(audio_engine_state.duration))
+                        .expect("Failed to send play to audio thread");
+
+                    ui_tx
+                        .send(UiCommand::SampleRate(audio_engine_state.sample_rate))
                         .expect("Failed to send play to audio thread");
 
                     state = PlayerState::Playing;
@@ -325,6 +330,7 @@ struct AudioEngineState {
     pub decode_opts: Option<DecoderOptions>,
     pub track_info: Option<PlayTrackOptions>,
     pub duration: u64,
+    pub sample_rate: f32,
 }
 
 fn load_file(
@@ -382,7 +388,11 @@ fn load_file(
             );
 
             // Get the selected track's timebase and duration.
-            let _tb = track.codec_params.time_base;
+            if let Some(time_base) = track.codec_params.time_base {
+                audio_engine_state.sample_rate = time_base.denom as f32;
+            }
+
+
             let dur = track
                 .codec_params
                 .n_frames
@@ -390,13 +400,13 @@ fn load_file(
 
             if let Some(duration) = dur {
                 audio_engine_state.duration = duration;
+
+                tracing::info!(
+                    "Track Duration: {}",
+                    duration
+                );
             }
 
-            tracing::info!(
-                "Track Duration: {}, TimeBase: {}",
-                dur.unwrap_or(0),
-                _tb.unwrap()
-            );
         }
         Err(err) => {
             // The input was not supported by any format reader.

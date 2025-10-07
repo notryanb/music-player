@@ -36,6 +36,7 @@ pub enum UiCommand {
     AudioFinished,
     TotalTrackDuration(u64),
     CurrentTimestamp(u64),
+    SampleRate(f32),
 }
 
 pub enum LibraryCommand {

@@ -13,6 +13,7 @@ pub struct Player {
     pub volume: f32,
     pub seek_to_timestamp: u64,
     pub duration: u64,
+    pub sample_rate: f32,
     pub cursor: Arc<AtomicU32>, // This can "overflow"
 }
 
@@ -30,6 +31,7 @@ impl Player {
             volume: 1.0,
             seek_to_timestamp: 0, // TODO: This should have subsecond precision, but is okay for now.
             duration: 0,
+            sample_rate: 44100.0,
             cursor,
         }
     }
@@ -152,6 +154,10 @@ impl Player {
 
     pub fn set_duration(&mut self, duration: u64) {
         self.duration = duration;
+    }
+
+    pub fn set_sample_rate(&mut self, sample_rate: f32) {
+        self.sample_rate = sample_rate;
     }
 }
 

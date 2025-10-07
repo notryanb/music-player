@@ -44,6 +44,7 @@ impl AppComponent for PlayerComponent {
 
             let mut seek_to_timestamp = ctx.player.as_ref().unwrap().seek_to_timestamp;
             let mut duration = ctx.player.as_ref().unwrap().duration;
+            let mut sample_rate = ctx.player.as_ref().unwrap().sample_rate;
 
             if let Ok(new_seek_cmd) = ctx.player.as_ref().unwrap().ui_rx.try_recv() {
                 match new_seek_cmd {
@@ -54,6 +55,11 @@ impl AppComponent for PlayerComponent {
                         tracing::info!("Received Duration: {}", dur);
                         duration = dur;
                         ctx.player.as_mut().unwrap().set_duration(dur);
+                    }
+                    UiCommand::SampleRate(sr) => {
+                        tracing::info!("Received sample_rate: {}", sr);
+                        sample_rate = sr;
+                        ctx.player.as_mut().unwrap().set_sample_rate(sr);
                     }
                     UiCommand::AudioFinished => {
                         tracing::info!("Track finished, getting next...");
@@ -115,8 +121,8 @@ impl AppComponent for PlayerComponent {
                 }
             }
 
-            let TimeParts { hours: _duration_hours, minutes: duration_minutes, seconds: duration_seconds } = time_parts_from_duration(duration);
-            let TimeParts { hours: _current_hours, minutes: current_minutes, seconds: current_seconds } = time_parts_from_duration(seek_to_timestamp);
+            let TimeParts { hours: _duration_hours, minutes: duration_minutes, seconds: duration_seconds } = time_parts_from_duration(duration, sample_rate);
+            let TimeParts { hours: _current_hours, minutes: current_minutes, seconds: current_seconds } = time_parts_from_duration(seek_to_timestamp, sample_rate);
             ui.label(format!("{:01}:{:02} / {:01}:{:02}", current_minutes, current_seconds, duration_minutes, duration_seconds));
         });
     }
@@ -128,8 +134,8 @@ struct TimeParts {
     pub seconds: u32,
 }
 
-fn time_parts_from_duration(duration: u64) -> TimeParts {
-    let duration_total_secs = duration as f32 / 1000.0 / 60.0;
+fn time_parts_from_duration(duration: u64, sample_rate: f32) -> TimeParts {
+    let duration_total_secs = duration as f32 / sample_rate;
     let duration_total_min = (duration_total_secs / 60.0).floor();
     let duration_total_hours = (duration_total_min / 60.0).floor();
     let duration_leftover_secs = (duration_total_secs.floor() - duration_total_min) as u32 % 60;
