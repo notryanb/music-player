@@ -47,13 +47,14 @@ It is not meant to be used as a serious audio player.
 - [x] Fix all egui deprecation errors... should be just one for using `CollapsingState` instead of `CollapsingHeader`
 - [ ] Fix Dark mode now that egui has made some changes in 0.18
 - [ ] Figure out error handling (anyhow, eyre, thiserror, etc...)
-- [ ] Remove tracks from playlist.
+- [ ] Flatten the app state and handle all UI Commands in one spot. This way the state has a way to act on all the subsystems in one spot
+- [x] Remove tracks from playlist.
 - [ ] Reorder items in playlist.
-- [ ] Support multiple directories for library
+- [x] Support multiple directories for library
 - [ ] Figure out how to use at least one hotkey and key event.
 - [ ] Define key events for the application
-- [ ] Selected track is highlighted.
-- [ ] Playlist plays to end after track is selected.
+- [x] Currently playing track is highlighted.
+- [x] Playlist plays to end after track is selected.
 - [ ] Save playlists.
 - [ ] Handle files which can't be decoded correctly into audio. 
 - [ ] Implement library search.

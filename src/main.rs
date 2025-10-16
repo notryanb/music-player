@@ -392,7 +392,6 @@ fn load_file(
                 audio_engine_state.sample_rate = time_base.denom as f32;
             }
 
-
             let dur = track
                 .codec_params
                 .n_frames
@@ -401,12 +400,8 @@ fn load_file(
             if let Some(duration) = dur {
                 audio_engine_state.duration = duration;
 
-                tracing::info!(
-                    "Track Duration: {}",
-                    duration
-                );
+                tracing::info!("Track Duration: {}", duration);
             }
-
         }
         Err(err) => {
             // The input was not supported by any format reader.

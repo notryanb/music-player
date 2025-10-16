@@ -121,9 +121,20 @@ impl AppComponent for PlayerComponent {
                 }
             }
 
-            let TimeParts { hours: _duration_hours, minutes: duration_minutes, seconds: duration_seconds } = time_parts_from_duration(duration, sample_rate);
-            let TimeParts { hours: _current_hours, minutes: current_minutes, seconds: current_seconds } = time_parts_from_duration(seek_to_timestamp, sample_rate);
-            ui.label(format!("{:01}:{:02} / {:01}:{:02}", current_minutes, current_seconds, duration_minutes, duration_seconds));
+            let TimeParts {
+                hours: _duration_hours,
+                minutes: duration_minutes,
+                seconds: duration_seconds,
+            } = time_parts_from_duration(duration, sample_rate);
+            let TimeParts {
+                hours: _current_hours,
+                minutes: current_minutes,
+                seconds: current_seconds,
+            } = time_parts_from_duration(seek_to_timestamp, sample_rate);
+            ui.label(format!(
+                "{:01}:{:02} / {:01}:{:02}",
+                current_minutes, current_seconds, duration_minutes, duration_seconds
+            ));
         });
     }
 }
@@ -143,6 +154,6 @@ fn time_parts_from_duration(duration: u64, sample_rate: f32) -> TimeParts {
     TimeParts {
         hours: duration_total_hours as u32,
         minutes: duration_total_min as u32,
-        seconds: duration_leftover_secs,    
+        seconds: duration_leftover_secs,
     }
 }
