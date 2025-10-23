@@ -1,6 +1,6 @@
 use eframe::egui;
 
-use super::{App, LibraryCommand};
+use super::{App, UiCommand};
 use crate::app::components::{
     footer::Footer, library_component::LibraryComponent, menu_bar::MenuBar,
     player_component::PlayerComponent, playlist_table::PlaylistTable, playlist_tabs::PlaylistTabs,
@@ -20,14 +20,34 @@ impl eframe::App for App {
 
         ctx.request_repaint();
 
-        if let Some(lib_cmd_rx) = &self.library_cmd_rx {
-            match lib_cmd_rx.try_recv() {
-                Ok(lib_cmd) => match lib_cmd {
-                    LibraryCommand::AddItem(lib_item) => self.library.add_item(lib_item),
-                    LibraryCommand::AddView(lib_view) => self.library.add_view(lib_view),
-                    LibraryCommand::AddPathId(path_id) => {
+        // Map event processing loop
+        if let Some(cmd_rx) = &self.ui_rx {
+            match cmd_rx.try_recv() {
+                Ok(cmd) => match cmd {
+                    UiCommand::LibraryAddItem(lib_item) => self.library.add_item(lib_item),
+                    UiCommand::LibraryAddView(lib_view) => self.library.add_view(lib_view),
+                    UiCommand::LibraryAddPathId(path_id) => {
                         self.library.set_path_to_imported(path_id)
+                    },
+                    UiCommand::CurrentTimestamp(seek_timestamp) => {
+                        self.player.as_mut().unwrap().set_seek_to_timestamp(seek_timestamp);
                     }
+                    UiCommand::TotalTrackDuration(dur) => {
+                        tracing::info!("Received Duration: {}", dur);
+                        self.player.as_mut().unwrap().set_duration(dur);
+                    }
+                    UiCommand::SampleRate(sr) => {
+                        tracing::info!("Received sample_rate: {}", sr);
+                        self.player.as_mut().unwrap().set_sample_rate(sr);
+                    }
+                    UiCommand::AudioFinished => {
+                        tracing::info!("Track finished, getting next...");
+
+                        self.player
+                            .as_mut()
+                            .unwrap()
+                            .next(&self.playlists[(self.current_playlist_idx).unwrap()]);
+                    },
                 },
                 Err(_) => (),
             }

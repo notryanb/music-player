@@ -27,11 +27,10 @@ fn main() {
     tracing_subscriber::fmt::init();
     tracing::info!("App booting...");
 
-    let (lib_cmd_tx, lib_cmd_rx) = channel();
     let (audio_tx, audio_rx) = channel();
     let (ui_tx, ui_rx) = channel();
     let cursor = Arc::new(AtomicU32::new(0));
-    let player = Player::new(audio_tx, ui_rx, cursor);
+    let player = Player::new(audio_tx, cursor);
 
     // Create a ring buffer with a capacity for up-to 200ms of audio.
     // let ring_len = ((2 * config.sample_rate.0 as usize) / 1000) * num_channels;
@@ -47,8 +46,8 @@ fn main() {
     app.scope = Some(Scope::new());
     app.temp_buf = Some(vec![0.0f32; 48000]);
     app.player = Some(player);
-    app.library_cmd_tx = Some(lib_cmd_tx);
-    app.library_cmd_rx = Some(lib_cmd_rx);
+    app.ui_tx = Some(ui_tx.clone());
+    app.ui_rx = Some(ui_rx);
     app.played_audio_buffer = Some(gui_ring_buf_consumer);
     app.is_processing_ui_change = Some(is_processing_ui_change.clone());
 
@@ -158,8 +157,6 @@ fn main() {
                             }
                             Err(err) => break 'once Err(err),
                         }
-
-                        //Ok(())
                     };
 
                     // Return if a fatal error occured.

@@ -1,6 +1,6 @@
 use super::AppComponent;
 use crate::egui::style::HandleShape;
-use crate::{app::App, UiCommand};
+use crate::{app::App};
 
 pub struct PlayerComponent;
 
@@ -43,34 +43,8 @@ impl AppComponent for PlayerComponent {
             }
 
             let mut seek_to_timestamp = ctx.player.as_ref().unwrap().seek_to_timestamp;
-            let mut duration = ctx.player.as_ref().unwrap().duration;
-            let mut sample_rate = ctx.player.as_ref().unwrap().sample_rate;
-
-            if let Ok(new_seek_cmd) = ctx.player.as_ref().unwrap().ui_rx.try_recv() {
-                match new_seek_cmd {
-                    UiCommand::CurrentTimestamp(seek_timestamp) => {
-                        seek_to_timestamp = seek_timestamp;
-                    }
-                    UiCommand::TotalTrackDuration(dur) => {
-                        tracing::info!("Received Duration: {}", dur);
-                        duration = dur;
-                        ctx.player.as_mut().unwrap().set_duration(dur);
-                    }
-                    UiCommand::SampleRate(sr) => {
-                        tracing::info!("Received sample_rate: {}", sr);
-                        sample_rate = sr;
-                        ctx.player.as_mut().unwrap().set_sample_rate(sr);
-                    }
-                    UiCommand::AudioFinished => {
-                        tracing::info!("Track finished, getting next...");
-
-                        ctx.player
-                            .as_mut()
-                            .unwrap()
-                            .next(&ctx.playlists[(ctx.current_playlist_idx).unwrap()]);
-                    } //_ => {}
-                }
-            }
+            let duration = ctx.player.as_ref().unwrap().duration;
+            let sample_rate = ctx.player.as_ref().unwrap().sample_rate;
 
             // Time Slider
             // TODO - use custom_formatter to maybe turn the duration/timestamp into a

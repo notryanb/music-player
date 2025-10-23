@@ -37,13 +37,11 @@ pub enum UiCommand {
     TotalTrackDuration(u64),
     CurrentTimestamp(u64),
     SampleRate(f32),
+    LibraryAddView(LibraryView),
+    LibraryAddItem(LibraryItem),
+    LibraryAddPathId(LibraryPathId),
 }
 
-pub enum LibraryCommand {
-    AddView(LibraryView),
-    AddItem(LibraryItem),
-    AddPathId(LibraryPathId),
-}
 
 #[derive(Serialize, Deserialize)]
 pub struct App {
@@ -60,10 +58,10 @@ pub struct App {
     pub playlist_idx_to_remove: Option<usize>,
 
     #[serde(skip_serializing, skip_deserializing)]
-    pub library_cmd_tx: Option<Sender<LibraryCommand>>,
+    pub ui_rx: Option<Receiver<UiCommand>>,
 
     #[serde(skip_serializing, skip_deserializing)]
-    pub library_cmd_rx: Option<Receiver<LibraryCommand>>,
+    pub ui_tx: Option<Sender<UiCommand>>,
 
     #[serde(skip_serializing, skip_deserializing)]
     pub played_audio_buffer: Option<rb::Consumer<f32>>,
@@ -95,8 +93,8 @@ impl Default for App {
             current_playlist_idx: None,
             player: None,
             playlist_idx_to_remove: None,
-            library_cmd_tx: None,
-            library_cmd_rx: None,
+            ui_tx: None,
+            ui_rx: None,
             played_audio_buffer: None,
             scope: Some(Scope::new()),
             temp_buf: Some(vec![0.0f32; 4096]),
@@ -138,6 +136,7 @@ impl App {
 
     // Spawns a background thread and imports files
     // from each unimported library path
+    // TODO - Time and profile this thread
     fn import_library_paths(&self, lib_path: &LibraryPath) {
         if lib_path.status() == LibraryPathStatus::Imported {
             tracing::info!("already imported library path...");
@@ -146,7 +145,7 @@ impl App {
 
         tracing::info!("adding library path...");
 
-        let lib_cmd_tx = self.library_cmd_tx.as_ref().unwrap().clone();
+        let cmd_tx = self.ui_tx.as_ref().unwrap().clone();
         let path = lib_path.path().clone();
         let path_id = lib_path.id().clone();
 
@@ -188,8 +187,8 @@ impl App {
 
             // Populate the library
             for item in &items {
-                lib_cmd_tx
-                    .send(LibraryCommand::AddItem((*item).clone()))
+                cmd_tx
+                    .send(UiCommand::LibraryAddItem((*item).clone()))
                     .expect("failed to send library item")
             }
 
@@ -218,12 +217,12 @@ impl App {
                 library_view.containers.push(lib_item_container.clone());
             }
 
-            lib_cmd_tx
-                .send(LibraryCommand::AddView(library_view))
+            cmd_tx
+                .send(UiCommand::LibraryAddView(library_view))
                 .expect("Failed to send library view");
 
-            lib_cmd_tx
-                .send(LibraryCommand::AddPathId(path_id))
+            cmd_tx
+                .send(UiCommand::LibraryAddPathId(path_id))
                 .expect("Failed to send library view");
             //lib_path.set_imported();
         });

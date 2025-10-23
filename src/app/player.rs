@@ -1,15 +1,14 @@
 use crate::app::library::LibraryItem;
 use crate::app::playlist::Playlist;
-use crate::{AudioCommand, UiCommand};
+use crate::{AudioCommand};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::{Sender};
 use std::sync::Arc;
 
 pub struct Player {
     pub track_state: TrackState,
     pub selected_track: Option<LibraryItem>,
     pub audio_tx: Sender<AudioCommand>,
-    pub ui_rx: Receiver<UiCommand>,
     pub volume: f32,
     pub seek_to_timestamp: u64,
     pub duration: u64,
@@ -20,14 +19,12 @@ pub struct Player {
 impl Player {
     pub fn new(
         audio_cmd_tx: Sender<AudioCommand>,
-        ui_cmd_rx: Receiver<UiCommand>,
         cursor: Arc<AtomicU32>,
     ) -> Self {
         Self {
             track_state: TrackState::Unstarted,
             selected_track: None,
             audio_tx: audio_cmd_tx,
-            ui_rx: ui_cmd_rx,
             volume: 1.0,
             seek_to_timestamp: 0, // TODO: This should have subsecond precision, but is okay for now.
             duration: 0,
@@ -148,6 +145,8 @@ impl Player {
         }
     }
 
+    // This should probably be called something else like current timestamp because it is used by the UI
+    // to indicate where the slider is.
     pub fn set_seek_to_timestamp(&mut self, seek_to_timestamp: u64) {
         self.seek_to_timestamp = seek_to_timestamp;
     }
