@@ -9,21 +9,40 @@ impl AppComponent for PlaylistTabs {
 
     fn add(ctx: &mut Self::Context, ui: &mut eframe::egui::Ui) {
         ui.horizontal_wrapped(|ui| {
-            for (idx, playlist) in ctx.playlists.iter().enumerate() {
-                let playlist_tab = ui.add(
-                    egui::Label::new(playlist.get_name().unwrap()).sense(egui::Sense::click()),
-                );
+            for (idx, playlist) in ctx.playlists.iter_mut().enumerate() {
+                let mut playlist_name = playlist.get_name().unwrap();
 
-                if playlist_tab.clicked() {
-                    ctx.current_playlist_idx = Some(idx);
-                }
+                if playlist.is_editing_name {
+                    let response = ui.add(egui::TextEdit::singleline(&mut playlist_name));
 
-                // TODO - make this bring up a context menu, however just delete for
-                // now.
-                if playlist_tab.clicked_by(egui::PointerButton::Secondary) {
-                    ctx.playlist_idx_to_remove = Some(idx);
+                    if response.changed() {
+                        playlist.set_name(playlist_name);
+                    }
+
+                    if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        playlist.is_editing_name = false;
+                    }
+                } else {
+                    let playlist_tab = ui.add(
+                        egui::Label::new(playlist_name).sense(egui::Sense::click())
+                    );
+
+                    if playlist_tab.clicked() {
+                        ctx.current_playlist_idx = Some(idx);
+                    }
+
+                    // TODO - make this bring up a context menu, however just delete for
+                    // now.
+                    if playlist_tab.clicked_by(egui::PointerButton::Secondary) {
+                        ctx.playlist_idx_to_remove = Some(idx);
+                    }
+
+                    if playlist_tab.double_clicked() {
+                        playlist.is_editing_name = true;
+                    }
                 }
             }
+
 
             if let Some(idx) = ctx.playlist_idx_to_remove {
                 ctx.playlist_idx_to_remove = None;

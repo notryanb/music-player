@@ -8,6 +8,7 @@ pub struct Playlist {
     name: Option<String>,
     pub tracks: Vec<LibraryItem>,
     pub selected: Option<LibraryItem>,
+    pub is_editing_name: bool,
 }
 
 impl Playlist {
@@ -16,6 +17,7 @@ impl Playlist {
             name: None,
             tracks: vec![],
             selected: None,
+            is_editing_name: false,
         }
     }
 
