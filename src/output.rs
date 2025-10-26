@@ -9,6 +9,8 @@
 
 use std::result;
 
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use symphonia::core::audio::{AudioBufferRef, SignalSpec};
 use symphonia::core::units::Duration;
 
@@ -18,6 +20,7 @@ pub trait AudioOutput {
         &mut self,
         decoded: AudioBufferRef<'_>,
         gui_ring_buf_producer: &rb::Producer<f32>,
+        process_gui_samples: &Arc<AtomicBool>,
         volume: f32,
     ) -> Result<()>;
     fn flush(&mut self);
@@ -187,6 +190,8 @@ mod cpal {
     use rb::*;
 
     use log::{error, info};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     pub struct CpalAudioOutput;
 
@@ -357,6 +362,7 @@ mod cpal {
             &mut self,
             decoded: AudioBufferRef<'_>,
             gui_ring_buf_producer: &rb::Producer<f32>,
+            process_gui_samples: &Arc<AtomicBool>,
             volume: f32,
         ) -> Result<()> {
             // Do nothing if there are no audio frames.
@@ -377,18 +383,20 @@ mod cpal {
                 self.sample_buf.samples()
             };
 
-            // TODO - If the GUI isn't displaying anything dependent upon the recent samples, 
-            // there is no need to send them. Use an AtomicBool or something else to coordinate this
-            // feature
-            // TODO - Probably don't need to map the samples twice to be sent to different places
+            // TODO - Probably don't need to map the samples twice to be sent to different places.
+            // One reason this is difficult is the second write expects a &[T] where the gui RB
+            // expects a &[f32]. Maybe the audio sample buffer can be changed to handle only f32
+            // because all T should be convertible to f32.
             
             // Write all samples to the ring buffer.
-            let _written_count_to_scope = gui_ring_buf_producer.write(
-                &samples
-                    .iter()
-                    .map(|s| s.to_sample::<f32>())
-                    .collect::<Vec<f32>>(),
-            );
+            if process_gui_samples.load(Ordering::Relaxed) {
+                let _written_count_to_scope = gui_ring_buf_producer.write(
+                    &samples
+                        .iter()
+                        .map(|s| s.to_sample::<f32>())
+                        .collect::<Vec<f32>>(),
+                );
+            }
 
             // Write all samples to the ring buffer.
             while let Some(written) = self

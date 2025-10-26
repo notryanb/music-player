@@ -1,4 +1,5 @@
 use eframe::egui;
+use std::sync::atomic::Ordering;
 
 use super::{App, UiCommand};
 use crate::app::components::{
@@ -71,6 +72,9 @@ impl eframe::App for App {
             PlayerComponent::add(self, ui);
 
             if self.show_oscilloscope {
+                if !self.process_gui_samples.load(Ordering::Relaxed) {
+                    self.process_gui_samples.store(true, Ordering::Relaxed);
+                }
                 ScopeComponent::add(self, ui);
             }
         });

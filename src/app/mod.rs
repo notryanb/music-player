@@ -54,6 +54,9 @@ pub struct App {
     pub show_oscilloscope: bool,
 
     #[serde(skip_serializing, skip_deserializing)]
+    pub process_gui_samples: Arc<AtomicBool>,
+
+    #[serde(skip_serializing, skip_deserializing)]
     pub player: Option<Player>,
 
     #[serde(skip_serializing, skip_deserializing)]
@@ -94,6 +97,7 @@ impl Default for App {
             playlists: vec![],
             current_playlist_idx: None,
             show_oscilloscope: false,
+            process_gui_samples: Arc::new(AtomicBool::new(false)),
             player: None,
             playlist_idx_to_remove: None,
             ui_tx: None,

@@ -42,6 +42,8 @@ fn main() {
 
     // App setup
     let is_processing_ui_change = Arc::new(AtomicBool::new(false));
+    let process_gui_samples = Arc::new(AtomicBool::new(false));
+
     let mut app = App::load().unwrap_or_default();
     app.scope = Some(Scope::new());
     app.temp_buf = Some(vec![0.0f32; 48000]);
@@ -50,6 +52,7 @@ fn main() {
     app.ui_rx = Some(ui_rx);
     app.played_audio_buffer = Some(gui_ring_buf_consumer);
     app.is_processing_ui_change = Some(is_processing_ui_change.clone());
+    app.process_gui_samples = process_gui_samples.clone();
 
     // Audio output setup
     let _audio_thread = thread::spawn(move || {
@@ -72,7 +75,12 @@ fn main() {
         let mut timer = std::time::Instant::now();
 
         loop {
-            process_audio_cmd(&audio_rx, &mut state, &mut volume, &is_processing_ui_change);
+            process_audio_cmd(
+                &audio_rx, 
+                &mut state, 
+                &mut volume, 
+                &is_processing_ui_change,
+            );
 
             match state {
                 PlayerState::Playing => {
@@ -142,7 +150,12 @@ fn main() {
                                 if packet.ts() >= play_opts.seek_ts {
                                     if let Some(audio_output) = audio_output {
                                         audio_output
-                                            .write(decoded, &gui_ring_buf_producer, volume)
+                                            .write(
+                                                decoded, 
+                                                &gui_ring_buf_producer, 
+                                                &process_gui_samples,
+                                                volume
+                                            )
                                             .unwrap();
                                     }
                                 }
