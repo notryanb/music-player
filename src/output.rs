@@ -377,6 +377,11 @@ mod cpal {
                 self.sample_buf.samples()
             };
 
+            // TODO - If the GUI isn't displaying anything dependent upon the recent samples, 
+            // there is no need to send them. Use an AtomicBool or something else to coordinate this
+            // feature
+            // TODO - Probably don't need to map the samples twice to be sent to different places
+            
             // Write all samples to the ring buffer.
             let _written_count_to_scope = gui_ring_buf_producer.write(
                 &samples

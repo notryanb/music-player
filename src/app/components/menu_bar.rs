@@ -99,6 +99,14 @@ impl AppComponent for MenuBar {
                 };
             });
 
+            ui.menu_button("View", |ui| {
+               let osc_button = ui.button("Oscilloscope");
+
+               if osc_button.clicked() {
+                   ctx.show_oscilloscope = !ctx.show_oscilloscope;
+               } 
+            });
+
             ui.menu_button("Help", |ui| {
                 let _about_btn = ui.button("About");
             });

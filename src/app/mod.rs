@@ -51,6 +51,8 @@ pub struct App {
 
     pub current_playlist_idx: Option<usize>,
 
+    pub show_oscilloscope: bool,
+
     #[serde(skip_serializing, skip_deserializing)]
     pub player: Option<Player>,
 
@@ -91,6 +93,7 @@ impl Default for App {
             library: Library::new(),
             playlists: vec![],
             current_playlist_idx: None,
+            show_oscilloscope: false,
             player: None,
             playlist_idx_to_remove: None,
             ui_tx: None,

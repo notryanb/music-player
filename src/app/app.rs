@@ -69,7 +69,10 @@ impl eframe::App for App {
 
         egui::TopBottomPanel::top("Player").show(ctx, |ui| {
             PlayerComponent::add(self, ui);
-            ScopeComponent::add(self, ui);
+
+            if self.show_oscilloscope {
+                ScopeComponent::add(self, ui);
+            }
         });
 
         egui::TopBottomPanel::bottom("Footer").show(ctx, |ui| {
