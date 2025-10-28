@@ -9,7 +9,7 @@ impl AppComponent for MenuBar {
     type Context = App;
 
     fn add(ctx: &mut Self::Context, ui: &mut eframe::egui::Ui) {
-        eframe::egui::menu::bar(ui, |ui| {
+        crate::egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button("File", |ui| {
                 let _open_btn = ui.button("Open");
 
@@ -117,6 +117,7 @@ impl AppComponent for MenuBar {
                     .default_width(480.0)
                     .default_height(600.0)
                     .resizable([true, true])
+                    .collapsible(false)
                     .show(ui.ctx(), |ui| {
                         let available_height = ui.available_height();
                         let table = TableBuilder::new(ui)

@@ -1,5 +1,6 @@
 use super::AppComponent;
 use crate::egui::style::HandleShape;
+use crate::egui::SliderClamping;
 use crate::{app::App};
 
 pub struct PlayerComponent;
@@ -22,7 +23,7 @@ impl AppComponent for PlayerComponent {
                 eframe::egui::Slider::new(&mut volume, (0.0 as f32)..=(1.0 as f32))
                     .logarithmic(false)
                     .show_value(true)
-                    .clamp_to_range(true)
+                    .clamping(SliderClamping::Always)
                     .step_by(0.01)
                     .custom_formatter(|num, _| {
                         let db = 20.0 * num.log10();
@@ -32,7 +33,6 @@ impl AppComponent for PlayerComponent {
 
             if volume_slider.dragged() {
                 if let Some(is_processing_ui_change) = &ctx.is_processing_ui_change {
-                    // Only send if the volume is actually changing
                     if volume != previous_vol {
                         ctx.player
                             .as_mut()
@@ -53,7 +53,7 @@ impl AppComponent for PlayerComponent {
                 eframe::egui::Slider::new(&mut seek_to_timestamp, 0..=duration)
                     .logarithmic(false)
                     .show_value(false)
-                    .clamp_to_range(true)
+                    .clamping(SliderClamping::Always)
                     .trailing_fill(true)
                     .handle_shape(HandleShape::Rect { aspect_ratio: 0.5 }),
             );

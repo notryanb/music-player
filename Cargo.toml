@@ -5,24 +5,24 @@ authors = ["Ryan Blecher <notryanb@gmail.com>"]
 edition = "2021"
 
 [dependencies]
+arrayvec = "0.7.4"
 cpal = "0.15"
-eframe = "0.28"
-egui_extras = "0.28"
+eframe = "0.33"
+egui_extras = "0.33"
 id3 = "1.13"
 itertools = "0.12"
+log = { version = "0.4", features = ["release_max_level_info"] }
+rand = "0.8.5"
 rayon = "1.10"
+rb = "0.4.1"
+rubato = "0.12.0"
 rfd = "0.6"
 serde = { version = "1", features=["derive"] }
 serde_json = "1"
 tracing = "0.1.29"
 tracing-subscriber = "0.3.3"
-log = { version = "0.4", features = ["release_max_level_info"] }
-walkdir = "2.5"
-rubato = "0.12.0"
-rand = "0.8.5"
 symphonia = { version = "0.5.4", features = ["mp3"] }
-arrayvec = "0.7.4"
-rb = "0.4.1"
+walkdir = "2.5"
 
 [dependencies.confy]
 version = "0.6.1"

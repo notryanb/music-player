@@ -127,7 +127,7 @@ impl AppComponent for PlaylistTable {
                     if let Some(remove_id) = track_to_remove {
                         ctx.playlists[*current_playlist_idx].remove(remove_id);
                     }
-                })
+                });
         }
     }
 }

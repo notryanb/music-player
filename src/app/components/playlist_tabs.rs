@@ -19,7 +19,7 @@ impl AppComponent for PlaylistTabs {
                         playlist.set_name(playlist_name);
                     }
 
-                    if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    if response.lost_focus() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                         playlist.is_editing_name = false;
                     }
                 } else {
@@ -31,11 +31,12 @@ impl AppComponent for PlaylistTabs {
                         ctx.current_playlist_idx = Some(idx);
                     }
 
-                    // TODO - make this bring up a context menu, however just delete for
-                    // now.
-                    if playlist_tab.clicked_by(egui::PointerButton::Secondary) {
-                        ctx.playlist_idx_to_remove = Some(idx);
-                    }
+                    egui::containers::Popup::context_menu(&playlist_tab).id(egui::Id::new("playlist_options_menu"))
+                        .show(|ui| {
+                            if ui.button("Remove Playlist").clicked() {
+                                ctx.playlist_idx_to_remove = Some(idx);
+                            }
+                        });
 
                     if playlist_tab.double_clicked() {
                         playlist.is_editing_name = true;
