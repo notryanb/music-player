@@ -256,7 +256,7 @@ fn main() {
     }); // Audio Thread end
 
     let native_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([1024.0, 768.0]),
+        viewport: egui::ViewportBuilder::default().with_inner_size([1920.0, 960.0]),
         ..Default::default()
     };
 

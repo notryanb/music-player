@@ -21,7 +21,7 @@ impl eframe::App for App {
 
         ctx.request_repaint();
 
-        // Map event processing loop
+        // Main event processing loop
         if let Some(cmd_rx) = &self.ui_rx {
             match cmd_rx.try_recv() {
                 Ok(cmd) => match cmd {
@@ -69,7 +69,11 @@ impl eframe::App for App {
         });
 
         egui::TopBottomPanel::top("Player").show(ctx, |ui| {
-            PlayerComponent::add(self, ui);
+            egui::Frame::new()
+                .inner_margin(6)
+                .show(ui, |ui| {
+                    PlayerComponent::add(self, ui);
+                });
 
             if self.show_oscilloscope {
                 if !self.process_gui_samples.load(Ordering::Relaxed) {
@@ -85,7 +89,7 @@ impl eframe::App for App {
 
         egui::CentralPanel::default().show(ctx, |_ui| {
             egui::SidePanel::left("Library Window")
-                .default_width(350.0)
+                .default_width(500.0)
                 .show(ctx, |ui| {
                     LibraryComponent::add(self, ui);
                 });
