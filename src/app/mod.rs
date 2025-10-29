@@ -21,6 +21,7 @@ mod library;
 pub mod player;
 mod playlist;
 pub mod scope;
+pub mod meter;
 
 pub enum AudioCommand {
     Stop,
@@ -75,6 +76,9 @@ pub struct App {
     pub scope: Option<Scope>,
 
     #[serde(skip_serializing, skip_deserializing)]
+    pub rms_meter: [f32; 2],
+
+    #[serde(skip_serializing, skip_deserializing)]
     pub temp_buf: Option<Vec<f32>>,
 
     #[serde(skip_serializing, skip_deserializing)]
@@ -104,6 +108,7 @@ impl Default for App {
             ui_rx: None,
             played_audio_buffer: None,
             scope: Some(Scope::new()),
+            rms_meter: [0.0, 0.0],
             temp_buf: Some(vec![0.0f32; 4096]),
             quit: false,
             lib_config_selections: Default::default(),

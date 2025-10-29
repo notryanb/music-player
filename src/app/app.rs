@@ -8,6 +8,8 @@ use crate::app::components::{
     scope_component::ScopeComponent, AppComponent,
 };
 
+use crate::meter::{Meter, DB_TICKS, DB_SECTIONS, DbMapper};
+
 impl eframe::App for App {
     fn on_exit(&mut self, _ctx: Option<&eframe::glow::Context>) {
         tracing::info!("exiting and saving");
@@ -79,7 +81,15 @@ impl eframe::App for App {
                 if !self.process_gui_samples.load(Ordering::Relaxed) {
                     self.process_gui_samples.store(true, Ordering::Relaxed);
                 }
-                ScopeComponent::add(self, ui);
+
+                eframe::egui::Window::new("Oscilloscope")
+                    .default_width(600.0)
+                    .default_height(400.0)
+                    .resizable([true, true])
+                    .collapsible(false)
+                    .show(ctx, |ui| {
+                        ScopeComponent::add(self, ui);
+                    });
             }
         });
 
@@ -105,6 +115,26 @@ impl eframe::App for App {
                     egui::ScrollArea::both().show(ui, |ui| {
                         PlaylistTable::add(self, ui);
                     });
+                }
+
+                // Temporary
+                if self.show_oscilloscope {
+                    eframe::egui::Window::new("RMS Meter")
+                        .default_width(480.0)
+                        .default_height(640.0)
+                        .resizable([true, true])
+                        .collapsible(false)
+                        .show(ctx, |ui| {
+                            ui.add(
+                                Meter::new(&[self.rms_meter[0], self.rms_meter[1]])
+                                .with_ticks(&DB_TICKS)
+                                .with_sections(&DB_SECTIONS)
+                                .with_text_above("RMS")
+                                .show_max(true)
+                                .with_mapper(&DbMapper),
+                            );
+                            
+                        });
                 }
             });
         });

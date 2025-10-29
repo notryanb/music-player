@@ -305,10 +305,11 @@ mod cpal {
             let stream_result = device.build_output_stream(
                 &config,
                 move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
-                    // let volume = 1.0f32;
                     // Write out as many samples as possible from the ring buffer to the audio
                     // output.
                     let written = ring_buf_consumer.read(data).unwrap_or(0);
+
+                    tracing::info!("CPAL buffer len: {}, written: {}", data.len(), &written);
 
                     // Mute any remaining samples.
                     data[written..].iter_mut().for_each(|s| *s = T::MID);
@@ -319,7 +320,6 @@ mod cpal {
 
             if let Err(err) = stream_result {
                 error!("audio output stream open error: {}", err);
-
                 return Err(AudioOutputError::OpenStreamError);
             }
 
@@ -335,7 +335,7 @@ mod cpal {
             let sample_buf = SampleBuffer::<T>::new(duration, spec);
 
             let resampler = if spec.rate != config.sample_rate.0 {
-                info!("resampling {} Hz to {} Hz", spec.rate, config.sample_rate.0);
+                info!("resampling audio at {} Hz to playback at {} Hz", spec.rate, config.sample_rate.0);
                 Some(Resampler::new(
                     spec,
                     config.sample_rate.0 as usize,
@@ -382,6 +382,7 @@ mod cpal {
                 self.sample_buf.copy_interleaved_ref(decoded);
                 self.sample_buf.samples()
             };
+
 
             // TODO - Probably don't need to map the samples twice to be sent to different places.
             // One reason this is difficult is the second write expects a &[T] where the gui RB

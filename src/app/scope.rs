@@ -8,7 +8,7 @@ impl Scope {
     pub fn new() -> Self {
         Self {
             write_idx: 0,
-            buffer: vec![0.0f32; 48000 * 1],
+            buffer: vec![0.0f32; 48000],
         }
     }
 
@@ -73,7 +73,6 @@ impl<'a> Iterator for ScopeIterator<'a> {
             self.index -= self.scope.buffer.len();
         }
 
-        // I bet this is the cause of the issue. Entering an infinite loop
         if self.index == self.scope.write_idx || self.counter > self.scope.buffer.len() {
             return None;
         }
