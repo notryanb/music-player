@@ -290,7 +290,6 @@ impl Widget for Meter<'_> {
 
         let top_space: f32 = 24.0;
 
-
          if let Some(text) = self.text_above {
              let color = self.text_above_color.unwrap_or(Color32::GRAY);
 

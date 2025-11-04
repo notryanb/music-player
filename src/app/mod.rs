@@ -73,13 +73,16 @@ pub struct App {
     pub played_audio_buffer: Option<rb::Consumer<f32>>,
 
     #[serde(skip_serializing, skip_deserializing)]
+    pub ui_audio_buffer: Vec<f32>,
+    
+    #[serde(skip_serializing, skip_deserializing)]
+    pub gui_num_bytes_read: usize,
+    
+    #[serde(skip_serializing, skip_deserializing)]
     pub scope: Option<Scope>,
 
     #[serde(skip_serializing, skip_deserializing)]
     pub rms_meter: [f32; 2],
-
-    #[serde(skip_serializing, skip_deserializing)]
-    pub temp_buf: Option<Vec<f32>>,
 
     #[serde(skip_serializing, skip_deserializing)]
     pub quit: bool,
@@ -107,9 +110,10 @@ impl Default for App {
             ui_tx: None,
             ui_rx: None,
             played_audio_buffer: None,
+            ui_audio_buffer: vec![0.0f32; 4096],
+            gui_num_bytes_read: 0,
             scope: Some(Scope::new()),
-            rms_meter: [0.0, 0.0],
-            temp_buf: Some(vec![0.0f32; 4096]),
+            rms_meter: [f32::NEG_INFINITY, f32::NEG_INFINITY],
             quit: false,
             lib_config_selections: Default::default(),
             is_library_cfg_open: false,

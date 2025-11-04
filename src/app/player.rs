@@ -160,6 +160,7 @@ impl Player {
     }
 }
 
+#[derive(PartialEq)]
 pub enum TrackState {
     Unstarted,
     Stopped,

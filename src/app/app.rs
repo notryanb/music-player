@@ -1,5 +1,6 @@
 use eframe::egui;
 use std::sync::atomic::Ordering;
+use rb::RbConsumer;
 
 use super::{App, UiCommand};
 use crate::app::components::{
@@ -7,6 +8,7 @@ use crate::app::components::{
     player_component::PlayerComponent, playlist_table::PlaylistTable, playlist_tabs::PlaylistTabs,
     scope_component::ScopeComponent, AppComponent,
 };
+use crate::player::TrackState;
 
 use crate::meter::{Meter, DB_TICKS, DB_SECTIONS, DbMapper};
 
@@ -53,6 +55,45 @@ impl eframe::App for App {
                     },
                 },
                 Err(_) => (),
+            }
+        }
+
+        // copy data from the gui ring buffer into a local collection
+        // Individual GUI components can now copy the samples at their own cadence
+        if let Some(audio_buf) = &self.played_audio_buffer {
+            let num_bytes_read = audio_buf.read(&mut self.ui_audio_buffer[..]).unwrap_or(0);
+            self.gui_num_bytes_read = num_bytes_read;
+
+            // Set meter values
+            if num_bytes_read > 0 {
+                let left_samples_sum = self.ui_audio_buffer
+                    .iter()
+                    .skip(0)
+                    .step_by(2)
+                    .copied()
+                    .map(|x| x * x)
+                    .sum::<f32>();
+
+                let left_rms = (left_samples_sum / (num_bytes_read as f32 / 2.0)).sqrt();
+                let left_rms_db = 20.0 * left_rms.log10();
+
+                let right_samples_sum = self.ui_audio_buffer
+                    .iter()
+                    .skip(1)
+                    .step_by(2)
+                    .copied()
+                    .map(|x| x * x)
+                    .sum::<f32>();
+
+                let right_rms = (right_samples_sum / (num_bytes_read as f32 / 2.0)).sqrt();
+                let right_rms_db = 20.0 * right_rms.log10();
+                self.rms_meter = [left_rms_db, right_rms_db];
+            }
+
+            if let Some(transport) = &self.player {
+                if transport.track_state != TrackState::Playing {
+                    self.rms_meter = [f32::NEG_INFINITY, f32::NEG_INFINITY];
+                }
             }
         }
 
@@ -120,8 +161,8 @@ impl eframe::App for App {
                 // Temporary
                 if self.show_oscilloscope {
                     eframe::egui::Window::new("RMS Meter")
-                        .default_width(480.0)
-                        .default_height(640.0)
+                        .default_width(400.0)
+                        .default_height(600.0)
                         .resizable([true, true])
                         .collapsible(false)
                         .show(ctx, |ui| {
@@ -130,6 +171,7 @@ impl eframe::App for App {
                                 .with_ticks(&DB_TICKS)
                                 .with_sections(&DB_SECTIONS)
                                 .with_text_above("RMS")
+                                .with_bar_width(10.0)
                                 .show_max(true)
                                 .with_mapper(&DbMapper),
                             );

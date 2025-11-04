@@ -46,11 +46,12 @@ fn main() {
 
     let mut app = App::load().unwrap_or_default();
     app.scope = Some(Scope::new());
-    app.temp_buf = Some(vec![0.0f32; 48000]);
     app.player = Some(player);
     app.ui_tx = Some(ui_tx.clone());
     app.ui_rx = Some(ui_rx);
+    app.rms_meter = [f32::NEG_INFINITY, f32::NEG_INFINITY];
     app.played_audio_buffer = Some(gui_ring_buf_consumer);
+    app.ui_audio_buffer = vec![0.0f32; 4096];
     app.is_processing_ui_change = Some(is_processing_ui_change.clone());
     app.process_gui_samples = process_gui_samples.clone();
 
