@@ -309,7 +309,7 @@ mod cpal {
                     // output.
                     let written = ring_buf_consumer.read(data).unwrap_or(0);
 
-                    tracing::info!("CPAL buffer len: {}, written: {}", data.len(), &written);
+                    // tracing::info!("CPAL buffer len: {}, written: {}", data.len(), &written);
 
                     // Mute any remaining samples.
                     data[written..].iter_mut().for_each(|s| *s = T::MID);

@@ -42,7 +42,9 @@ impl AppComponent for MenuBar {
 
                 ui.separator();
 
-                let _pref_btn = ui.button("Preferences");
+                if ui.button("Preferences").clicked() {
+                    ctx.show_preferences_window = !ctx.show_preferences_window;
+                };
 
                 ui.separator();
 

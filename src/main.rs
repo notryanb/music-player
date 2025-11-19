@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::thread;
+use std::collections::VecDeque;
 
 use eframe::egui;
 use rb::*;
@@ -54,6 +55,7 @@ fn main() {
     app.ui_audio_buffer = vec![0.0f32; 4096];
     app.is_processing_ui_change = Some(is_processing_ui_change.clone());
     app.process_gui_samples = process_gui_samples.clone();
+    app.meter_samples = VecDeque::new();
 
     // Audio output setup
     let _audio_thread = thread::spawn(move || {

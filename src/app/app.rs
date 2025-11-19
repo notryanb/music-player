@@ -65,29 +65,36 @@ impl eframe::App for App {
             self.gui_num_bytes_read = num_bytes_read;
 
             // Set meter values
-            if num_bytes_read > 0 {
-                let left_samples_sum = self.ui_audio_buffer
+            let sample_window = (self.rms_meter_window_size_millis as f32 / 1000.0) * self.device_sample_rate;
+            
+            if (self.meter_samples.len() as f32) < sample_window * 2.0 {
+                self.meter_samples.extend(self.ui_audio_buffer.iter().by_ref());
+            } else {
+                let left_samples_sum = self.meter_samples
                     .iter()
                     .skip(0)
+                    .take(sample_window as usize)
                     .step_by(2)
                     .copied()
                     .map(|x| x * x)
                     .sum::<f32>();
 
-                let left_rms = (left_samples_sum / (num_bytes_read as f32 / 2.0)).sqrt();
+                let left_rms = (left_samples_sum / sample_window).sqrt();
                 let left_rms_db = 20.0 * left_rms.log10();
 
-                let right_samples_sum = self.ui_audio_buffer
+                let right_samples_sum = self.meter_samples
                     .iter()
                     .skip(1)
+                    .take(sample_window as usize)
                     .step_by(2)
                     .copied()
                     .map(|x| x * x)
                     .sum::<f32>();
 
-                let right_rms = (right_samples_sum / (num_bytes_read as f32 / 2.0)).sqrt();
+                let right_rms = (right_samples_sum / sample_window).sqrt();
                 let right_rms_db = 20.0 * right_rms.log10();
                 self.rms_meter = [left_rms_db, right_rms_db];
+                self.meter_samples.clear();
             }
 
             if let Some(transport) = &self.player {
@@ -105,6 +112,16 @@ impl eframe::App for App {
             );
 
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(display));
+        }
+        if self.show_preferences_window {
+            eframe::egui::Window::new("Preferences")
+                .default_width(200.0)
+                .default_height(200.0)
+                .resizable([false, false])
+                .collapsible(false)
+                .show(ctx, |ui| {
+                    ui.add(egui::Slider::new(&mut self.rms_meter_window_size_millis, 5..=5000).text("RMS Meter Window Size (ms)"));
+                });
         }
 
         egui::TopBottomPanel::top("MusicPlayer").show(ctx, |ui| {

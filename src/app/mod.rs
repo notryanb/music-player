@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
+use std::collections::VecDeque;
 
 use itertools::Itertools;
 
@@ -53,6 +54,16 @@ pub struct App {
     pub current_playlist_idx: Option<usize>,
 
     pub show_oscilloscope: bool,
+
+
+    pub rms_meter_window_size_millis: u16,
+
+    pub device_sample_rate: f32,
+
+    pub meter_samples: VecDeque<f32>,
+    
+    #[serde(skip_serializing, skip_deserializing)]
+    pub show_preferences_window: bool,
 
     #[serde(skip_serializing, skip_deserializing)]
     pub process_gui_samples: Arc<AtomicBool>,
@@ -104,6 +115,10 @@ impl Default for App {
             playlists: vec![],
             current_playlist_idx: None,
             show_oscilloscope: false,
+            show_preferences_window: false,
+            device_sample_rate: 44100.0,
+            rms_meter_window_size_millis: 250,
+            meter_samples: VecDeque::new(),
             process_gui_samples: Arc::new(AtomicBool::new(false)),
             player: None,
             playlist_idx_to_remove: None,
