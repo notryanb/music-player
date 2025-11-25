@@ -1,7 +1,7 @@
 use super::AppComponent;
+use crate::app::App;
 use crate::egui::style::HandleShape;
 use crate::egui::SliderClamping;
-use crate::{app::App};
 
 pub struct PlayerComponent;
 

@@ -1,8 +1,8 @@
 use crate::app::library::LibraryItem;
 use crate::app::playlist::Playlist;
-use crate::{AudioCommand};
+use crate::AudioCommand;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::mpsc::{Sender};
+use std::sync::mpsc::Sender;
 use std::sync::Arc;
 
 pub struct Player {
@@ -17,10 +17,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(
-        audio_cmd_tx: Sender<AudioCommand>,
-        cursor: Arc<AtomicU32>,
-    ) -> Self {
+    pub fn new(audio_cmd_tx: Sender<AudioCommand>, cursor: Arc<AtomicU32>) -> Self {
         Self {
             track_state: TrackState::Unstarted,
             selected_track: None,

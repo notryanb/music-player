@@ -22,7 +22,10 @@ impl AppComponent for ScopeComponent {
 
             if let Some(ref mut scope) = &mut ctx.scope {
                 if ctx.gui_num_bytes_read > 0 {
-                    for sample in (ctx.ui_audio_buffer[0..ctx.gui_num_bytes_read]).iter().step_by(2) {
+                    for sample in (ctx.ui_audio_buffer[0..ctx.gui_num_bytes_read])
+                        .iter()
+                        .step_by(2)
+                    {
                         scope.write_sample(*sample);
                     }
                 }

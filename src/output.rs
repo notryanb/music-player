@@ -9,8 +9,8 @@
 
 use std::result;
 
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use symphonia::core::audio::{AudioBufferRef, SignalSpec};
 use symphonia::core::units::Duration;
 
@@ -190,8 +190,8 @@ mod cpal {
     use rb::*;
 
     use log::{error, info};
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
 
     pub struct CpalAudioOutput;
 
@@ -335,7 +335,10 @@ mod cpal {
             let sample_buf = SampleBuffer::<T>::new(duration, spec);
 
             let resampler = if spec.rate != config.sample_rate.0 {
-                info!("resampling audio at {} Hz to playback at {} Hz", spec.rate, config.sample_rate.0);
+                info!(
+                    "resampling audio at {} Hz to playback at {} Hz",
+                    spec.rate, config.sample_rate.0
+                );
                 Some(Resampler::new(
                     spec,
                     config.sample_rate.0 as usize,
@@ -383,12 +386,11 @@ mod cpal {
                 self.sample_buf.samples()
             };
 
-
             // TODO - Probably don't need to map the samples twice to be sent to different places.
             // One reason this is difficult is the second write expects a &[T] where the gui RB
             // expects a &[f32]. Maybe the audio sample buffer can be changed to handle only f32
             // because all T should be convertible to f32.
-            
+
             // Write all samples to the ring buffer.
             if process_gui_samples.load(Ordering::Relaxed) {
                 let _written_count_to_scope = gui_ring_buf_producer.write(

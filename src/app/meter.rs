@@ -1,7 +1,7 @@
 // This is taken from FasterThanLime's 'fam' project with metering.
 
-use std::time::{Duration, Instant};
 use crate::egui::{pos2, vec2, Align2, Color32, FontId, Sense, Stroke, StrokeKind, Widget};
+use std::time::{Duration, Instant};
 
 pub struct Meter<'a> {
     values: &'a [f32],
@@ -64,30 +64,28 @@ pub struct Section {
     pub color: Color32,
 }
 
-pub const DEFAULT_SECTIONS: [Section; 1] = [
-    Section {
-        threshold: f32::NEG_INFINITY,
-        color: Color32::from_gray(170),  
-    }
-];
+pub const DEFAULT_SECTIONS: [Section; 1] = [Section {
+    threshold: f32::NEG_INFINITY,
+    color: Color32::from_gray(170),
+}];
 
 pub const DB_GREEN_COLOR: Color32 = Color32::from_rgb(56, 201, 56);
 pub const DB_YELLOW_COLOR: Color32 = Color32::from_rgb(242, 224, 26);
 pub const DB_RED_COLOR: Color32 = Color32::from_rgb(225, 59, 29);
 
 pub const DB_SECTIONS: [Section; 3] = [
-  Section {
-    threshold: f32::NEG_INFINITY,
-    color: DB_GREEN_COLOR,  
-  },
-  Section {
-    threshold: -10.0,
-    color: DB_YELLOW_COLOR,  
-  },
-  Section {
-    threshold: -5.0,
-    color: DB_RED_COLOR,  
-  },
+    Section {
+        threshold: f32::NEG_INFINITY,
+        color: DB_GREEN_COLOR,
+    },
+    Section {
+        threshold: -10.0,
+        color: DB_YELLOW_COLOR,
+    },
+    Section {
+        threshold: -5.0,
+        color: DB_RED_COLOR,
+    },
 ];
 
 impl<'a> Meter<'a> {
@@ -136,8 +134,8 @@ impl<'a> Meter<'a> {
         self.show_tick_values = show_tick_values;
         self
     }
-    
-    pub fn show_ticks_right(mut self, show_ticks_right: bool) ->  Self{
+
+    pub fn show_ticks_right(mut self, show_ticks_right: bool) -> Self {
         self.show_ticks_right = show_ticks_right;
         self
     }
@@ -225,7 +223,7 @@ fn decay(x: f32, dt: f32) -> f32 {
 }
 
 pub trait ValueMapper {
-    fn to_unit_height(&self, x: f32) -> f32;        
+    fn to_unit_height(&self, x: f32) -> f32;
 }
 
 impl ValueMapper for () {
@@ -250,7 +248,6 @@ impl ValueMapper for DbMapper {
         (c * (value + 20.0)).exp() * 0.5
     }
 }
-
 
 impl Widget for Meter<'_> {
     fn ui(self, ui: &mut crate::egui::Ui) -> crate::egui::Response {
@@ -283,52 +280,54 @@ impl Widget for Meter<'_> {
         let painter = ui.painter();
 
         let state: MeterState = ui.memory_mut(|mem| {
-            let state = mem.data.get_temp_mut_or_insert_with(id, || MeterState::new(&self));
+            let state = mem
+                .data
+                .get_temp_mut_or_insert_with(id, || MeterState::new(&self));
             state.update(&self);
             state.clone()
         });
 
         let top_space: f32 = 24.0;
 
-         if let Some(text) = self.text_above {
-             let color = self.text_above_color.unwrap_or(Color32::GRAY);
+        if let Some(text) = self.text_above {
+            let color = self.text_above_color.unwrap_or(Color32::GRAY);
 
-             painter.text(
-               rect.min + vec2(bars_left + (bars_width / 2.0) - spacing, top_space - 8.0),
-               Align2::CENTER_BOTTOM,
-               text,
-               FontId::proportional(10.0),
-               color,
-             );
-         }
+            painter.text(
+                rect.min + vec2(bars_left + (bars_width / 2.0) - spacing, top_space - 8.0),
+                Align2::CENTER_BOTTOM,
+                text,
+                FontId::proportional(10.0),
+                color,
+            );
+        }
 
-         rect.min.y += top_space;
+        rect.min.y += top_space;
 
-         let tick_color = Color32::GRAY;
-         let highlighted_tick_color = Color32::WHITE;
+        let tick_color = Color32::GRAY;
+        let highlighted_tick_color = Color32::WHITE;
 
-         let mut x = rect.min.x + spacing;
-         if self.show_tick_values {
-             for tick in self.ticks {
-                 let y = rect.bottom() - rect.height() * self.mapper.to_unit_height(tick.value);
+        let mut x = rect.min.x + spacing;
+        if self.show_tick_values {
+            for tick in self.ticks {
+                let y = rect.bottom() - rect.height() * self.mapper.to_unit_height(tick.value);
 
-                 let color = if tick.highlighted {
-                     highlighted_tick_color
-                 } else {
-                     tick_color
-                 };
+                let color = if tick.highlighted {
+                    highlighted_tick_color
+                } else {
+                    tick_color
+                };
 
-                 painter.text(
-                     pos2(rect.min.x + number_width, y),
-                     Align2::RIGHT_CENTER,
-                     format!("{}", tick.value),
-                     FontId::proportional(9.0),
-                     color,
-                 );
-             }
+                painter.text(
+                    pos2(rect.min.x + number_width, y),
+                    Align2::RIGHT_CENTER,
+                    format!("{}", tick.value),
+                    FontId::proportional(9.0),
+                    color,
+                );
+            }
 
-             x += number_width + spacing;
-         }
+            x += number_width + spacing;
+        }
 
         let render_tick = |painter: &crate::egui::Painter, x: f32, tick: &Tick| {
             let y = rect.bottom() - rect.height() * self.mapper.to_unit_height(tick.value);
@@ -340,8 +339,8 @@ impl Widget for Meter<'_> {
             };
 
             painter.line_segment(
-              [pos2(x, y), pos2(x + tick_width, y)]  ,
-              Stroke::new(1.0, color),
+                [pos2(x, y), pos2(x + tick_width, y)],
+                Stroke::new(1.0, color),
             );
         };
 
@@ -353,8 +352,8 @@ impl Widget for Meter<'_> {
 
         for (i, vstate) in state.values.iter().enumerate() {
             let bar_rect = crate::egui::Rect::from_min_size(
-              pos2(x + i as f32 * self.bar_width, rect.min.y),
-              vec2(self.bar_width, rect.height()),  
+                pos2(x + i as f32 * self.bar_width, rect.min.y),
+                vec2(self.bar_width, rect.height()),
             );
 
             painter.rect_filled(bar_rect, 0.0, Color32::from_gray(20));
@@ -362,7 +361,8 @@ impl Widget for Meter<'_> {
             let value_height = self.mapper.to_unit_height(vstate.value) * rect.height();
 
             for section in self.sections {
-                let threshold_height = self.mapper.to_unit_height(section.threshold) * rect.height();
+                let threshold_height =
+                    self.mapper.to_unit_height(section.threshold) * rect.height();
                 let section_height = (value_height - threshold_height).max(0.0);
 
                 if section_height > 0.0 {
@@ -372,7 +372,6 @@ impl Widget for Meter<'_> {
                             rect.bottom() - threshold_height - section_height,
                         ),
                         vec2(self.bar_width - 2.0, section_height),
-                        
                     );
                     painter.rect_filled(section_rect, 0.0, section.color);
                 }
@@ -397,11 +396,11 @@ impl Widget for Meter<'_> {
                 }
 
                 painter.line_segment(
-                  [
-                      pos2(bar_rect.min.x + 1.0, max_y),
-                      pos2(bar_rect.min.x - 1.0, max_y),
-                  ],
-                  Stroke::new(1.0, max_color),
+                    [
+                        pos2(bar_rect.min.x + 1.0, max_y),
+                        pos2(bar_rect.min.x - 1.0, max_y),
+                    ],
+                    Stroke::new(1.0, max_color),
                 );
             }
         }

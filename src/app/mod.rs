@@ -4,12 +4,13 @@ use library::{
 };
 use player::Player;
 use playlist::Playlist;
+use rms_calculator::RmsCalculator;
 use scope::Scope;
+
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
-use std::collections::VecDeque;
 
 use itertools::Itertools;
 
@@ -19,10 +20,11 @@ use rayon::prelude::*;
 mod app;
 mod components;
 mod library;
+pub mod meter;
 pub mod player;
 mod playlist;
+pub mod rms_calculator;
 pub mod scope;
-pub mod meter;
 
 pub enum AudioCommand {
     Stop,
@@ -44,7 +46,6 @@ pub enum UiCommand {
     LibraryAddPathId(LibraryPathId),
 }
 
-
 #[derive(Serialize, Deserialize)]
 pub struct App {
     pub library: Library,
@@ -55,13 +56,16 @@ pub struct App {
 
     pub show_oscilloscope: bool,
 
-
     pub rms_meter_window_size_millis: u16,
 
     pub device_sample_rate: f32,
 
-    pub meter_samples: VecDeque<f32>,
-    
+    #[serde(skip_serializing, skip_deserializing)]
+    pub rms_calc_left: RmsCalculator,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub rms_calc_right: RmsCalculator,
+
     #[serde(skip_serializing, skip_deserializing)]
     pub show_preferences_window: bool,
 
@@ -85,10 +89,10 @@ pub struct App {
 
     #[serde(skip_serializing, skip_deserializing)]
     pub ui_audio_buffer: Vec<f32>,
-    
+
     #[serde(skip_serializing, skip_deserializing)]
     pub gui_num_bytes_read: usize,
-    
+
     #[serde(skip_serializing, skip_deserializing)]
     pub scope: Option<Scope>,
 
@@ -118,7 +122,8 @@ impl Default for App {
             show_preferences_window: false,
             device_sample_rate: 44100.0,
             rms_meter_window_size_millis: 250,
-            meter_samples: VecDeque::new(),
+            rms_calc_left: RmsCalculator::new(5000),
+            rms_calc_right: RmsCalculator::new(5000),
             process_gui_samples: Arc::new(AtomicBool::new(false)),
             player: None,
             playlist_idx_to_remove: None,

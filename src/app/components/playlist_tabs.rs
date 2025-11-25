@@ -23,15 +23,15 @@ impl AppComponent for PlaylistTabs {
                         playlist.is_editing_name = false;
                     }
                 } else {
-                    let playlist_tab = ui.add(
-                        egui::Label::new(playlist_name).sense(egui::Sense::click())
-                    );
+                    let playlist_tab =
+                        ui.add(egui::Label::new(playlist_name).sense(egui::Sense::click()));
 
                     if playlist_tab.clicked() {
                         ctx.current_playlist_idx = Some(idx);
                     }
 
-                    egui::containers::Popup::context_menu(&playlist_tab).id(egui::Id::new("playlist_options_menu"))
+                    egui::containers::Popup::context_menu(&playlist_tab)
+                        .id(egui::Id::new("playlist_options_menu"))
                         .show(|ui| {
                             if ui.button("Remove Playlist").clicked() {
                                 ctx.playlist_idx_to_remove = Some(idx);
@@ -43,7 +43,6 @@ impl AppComponent for PlaylistTabs {
                     }
                 }
             }
-
 
             if let Some(idx) = ctx.playlist_idx_to_remove {
                 ctx.playlist_idx_to_remove = None;

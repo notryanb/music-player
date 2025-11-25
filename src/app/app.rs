@@ -1,6 +1,6 @@
 use eframe::egui;
-use std::sync::atomic::Ordering;
 use rb::RbConsumer;
+use std::sync::atomic::Ordering;
 
 use super::{App, UiCommand};
 use crate::app::components::{
@@ -10,7 +10,7 @@ use crate::app::components::{
 };
 use crate::player::TrackState;
 
-use crate::meter::{Meter, DB_TICKS, DB_SECTIONS, DbMapper};
+use crate::meter::{DbMapper, Meter, DB_SECTIONS, DB_TICKS};
 
 impl eframe::App for App {
     fn on_exit(&mut self, _ctx: Option<&eframe::glow::Context>) {
@@ -33,9 +33,12 @@ impl eframe::App for App {
                     UiCommand::LibraryAddView(lib_view) => self.library.add_view(lib_view),
                     UiCommand::LibraryAddPathId(path_id) => {
                         self.library.set_path_to_imported(path_id)
-                    },
+                    }
                     UiCommand::CurrentTimestamp(seek_timestamp) => {
-                        self.player.as_mut().unwrap().set_seek_to_timestamp(seek_timestamp);
+                        self.player
+                            .as_mut()
+                            .unwrap()
+                            .set_seek_to_timestamp(seek_timestamp);
                     }
                     UiCommand::TotalTrackDuration(dur) => {
                         tracing::info!("Received Duration: {}", dur);
@@ -52,7 +55,7 @@ impl eframe::App for App {
                             .as_mut()
                             .unwrap()
                             .next(&self.playlists[(self.current_playlist_idx).unwrap()]);
-                    },
+                    }
                 },
                 Err(_) => (),
             }
@@ -65,41 +68,43 @@ impl eframe::App for App {
             self.gui_num_bytes_read = num_bytes_read;
 
             // Set meter values
-            let sample_window = (self.rms_meter_window_size_millis as f32 / 1000.0) * self.device_sample_rate;
-            
-            if (self.meter_samples.len() as f32) < sample_window * 2.0 {
-                self.meter_samples.extend(self.ui_audio_buffer.iter().by_ref());
-            } else {
-                let left_samples_sum = self.meter_samples
-                    .iter()
-                    .skip(0)
-                    .take(sample_window as usize)
-                    .step_by(2)
-                    .copied()
-                    .map(|x| x * x)
-                    .sum::<f32>();
+            let sample_window =
+                (self.rms_meter_window_size_millis as f32 / 1000.0) * self.device_sample_rate;
+            self.rms_calc_left.set_window_size(sample_window as usize);
+            self.rms_calc_right.set_window_size(sample_window as usize);
 
-                let left_rms = (left_samples_sum / sample_window).sqrt();
-                let left_rms_db = 20.0 * left_rms.log10();
-
-                let right_samples_sum = self.meter_samples
-                    .iter()
-                    .skip(1)
-                    .take(sample_window as usize)
-                    .step_by(2)
-                    .copied()
-                    .map(|x| x * x)
-                    .sum::<f32>();
-
-                let right_rms = (right_samples_sum / sample_window).sqrt();
-                let right_rms_db = 20.0 * right_rms.log10();
-                self.rms_meter = [left_rms_db, right_rms_db];
-                self.meter_samples.clear();
+            for sample in self
+                .ui_audio_buffer
+                .iter()
+                .skip(0)
+                .take(sample_window as usize)
+                .step_by(2)
+            {
+                self.rms_calc_left.write_sample(*sample);
             }
+
+            for sample in self
+                .ui_audio_buffer
+                .iter()
+                .skip(1)
+                .take(sample_window as usize)
+                .step_by(2)
+            {
+                self.rms_calc_right.write_sample(*sample);
+            }
+
+            let left_rms = self.rms_calc_left.get_rms_value();
+            let right_rms = self.rms_calc_right.get_rms_value();
+
+            let left_rms_db = 20.0 * left_rms.log10();
+            let right_rms_db = 20.0 * right_rms.log10();
+            self.rms_meter = [left_rms_db, right_rms_db];
 
             if let Some(transport) = &self.player {
                 if transport.track_state != TrackState::Playing {
                     self.rms_meter = [f32::NEG_INFINITY, f32::NEG_INFINITY];
+                    self.rms_calc_left.reset();
+                    self.rms_calc_right.reset();
                 }
             }
         }
@@ -120,7 +125,10 @@ impl eframe::App for App {
                 .resizable([false, false])
                 .collapsible(false)
                 .show(ctx, |ui| {
-                    ui.add(egui::Slider::new(&mut self.rms_meter_window_size_millis, 5..=5000).text("RMS Meter Window Size (ms)"));
+                    ui.add(
+                        egui::Slider::new(&mut self.rms_meter_window_size_millis, 5..=5000)
+                            .text("RMS Meter Window Size (ms)"),
+                    );
                 });
         }
 
@@ -129,11 +137,9 @@ impl eframe::App for App {
         });
 
         egui::TopBottomPanel::top("Player").show(ctx, |ui| {
-            egui::Frame::new()
-                .inner_margin(6)
-                .show(ui, |ui| {
-                    PlayerComponent::add(self, ui);
-                });
+            egui::Frame::new().inner_margin(6).show(ui, |ui| {
+                PlayerComponent::add(self, ui);
+            });
 
             if self.show_oscilloscope {
                 if !self.process_gui_samples.load(Ordering::Relaxed) {
@@ -185,14 +191,13 @@ impl eframe::App for App {
                         .show(ctx, |ui| {
                             ui.add(
                                 Meter::new(&[self.rms_meter[0], self.rms_meter[1]])
-                                .with_ticks(&DB_TICKS)
-                                .with_sections(&DB_SECTIONS)
-                                .with_text_above("RMS")
-                                .with_bar_width(10.0)
-                                .show_max(true)
-                                .with_mapper(&DbMapper),
+                                    .with_ticks(&DB_TICKS)
+                                    .with_sections(&DB_SECTIONS)
+                                    .with_text_above("RMS")
+                                    .with_bar_width(10.0)
+                                    .show_max(true)
+                                    .with_mapper(&DbMapper),
                             );
-                            
                         });
                 }
             });

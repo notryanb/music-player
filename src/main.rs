@@ -1,4 +1,5 @@
 pub use crate::app::player::Player;
+pub use crate::app::rms_calculator::RmsCalculator;
 pub use crate::app::scope::Scope;
 pub use crate::app::App;
 pub use crate::app::*;
@@ -8,7 +9,6 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::thread;
-use std::collections::VecDeque;
 
 use eframe::egui;
 use rb::*;
@@ -55,7 +55,8 @@ fn main() {
     app.ui_audio_buffer = vec![0.0f32; 4096];
     app.is_processing_ui_change = Some(is_processing_ui_change.clone());
     app.process_gui_samples = process_gui_samples.clone();
-    app.meter_samples = VecDeque::new();
+    app.rms_calc_left = RmsCalculator::new(5000);
+    app.rms_calc_right = RmsCalculator::new(5000);
 
     // Audio output setup
     let _audio_thread = thread::spawn(move || {
@@ -78,12 +79,7 @@ fn main() {
         let mut timer = std::time::Instant::now();
 
         loop {
-            process_audio_cmd(
-                &audio_rx, 
-                &mut state, 
-                &mut volume, 
-                &is_processing_ui_change,
-            );
+            process_audio_cmd(&audio_rx, &mut state, &mut volume, &is_processing_ui_change);
 
             match state {
                 PlayerState::Playing => {
@@ -154,10 +150,10 @@ fn main() {
                                     if let Some(audio_output) = audio_output {
                                         audio_output
                                             .write(
-                                                decoded, 
-                                                &gui_ring_buf_producer, 
+                                                decoded,
+                                                &gui_ring_buf_producer,
                                                 &process_gui_samples,
-                                                volume
+                                                volume,
                                             )
                                             .unwrap();
                                     }
