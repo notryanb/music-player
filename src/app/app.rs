@@ -119,17 +119,21 @@ impl eframe::App for App {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(display));
         }
         if self.show_preferences_window {
-            eframe::egui::Window::new("Preferences")
+            let mut window = eframe::egui::Window::new("Preferences")
                 .default_width(200.0)
                 .default_height(200.0)
                 .resizable([false, false])
                 .collapsible(false)
-                .show(ctx, |ui| {
-                    ui.add(
-                        egui::Slider::new(&mut self.rms_meter_window_size_millis, 5..=5000)
-                            .text("RMS Meter Window Size (ms)"),
-                    );
-                });
+                .enabled(true);
+
+            window = window.open(&mut self.show_preferences_window);
+                
+            window.show(ctx, |ui| {
+                ui.add(
+                    egui::Slider::new(&mut self.rms_meter_window_size_millis, 5..=5000)
+                        .text("RMS Meter Window Size (ms)"),
+                );
+            });
         }
 
         egui::TopBottomPanel::top("MusicPlayer").show(ctx, |ui| {
@@ -146,14 +150,21 @@ impl eframe::App for App {
                     self.process_gui_samples.store(true, Ordering::Relaxed);
                 }
 
-                eframe::egui::Window::new("Oscilloscope")
+                let mut window = eframe::egui::Window::new("Oscilloscope")
                     .default_width(600.0)
                     .default_height(400.0)
                     .resizable([true, true])
                     .collapsible(false)
-                    .show(ctx, |ui| {
-                        ScopeComponent::add(self, ui);
-                    });
+                    .enabled(true);
+
+                let mut show_osc = self.show_oscilloscope.clone();                    
+                window = window.open(&mut show_osc);
+
+                window.show(ctx, |ui| {
+                    ScopeComponent::add(self, ui);
+                });
+
+                self.show_oscilloscope = show_osc;
             }
         });
 
