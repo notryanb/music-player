@@ -91,6 +91,12 @@ impl Library {
         self.items.push(library_item);
     }
 
+    pub fn add_items(&mut self, library_items: Vec<LibraryItem>) {
+        for item in library_items.into_iter() {
+            self.add_item(item);
+        }
+    }
+
     pub fn add_view(&mut self, library_view: LibraryView) {
         let mut new = library_view.containers.clone();
 

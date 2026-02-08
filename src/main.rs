@@ -44,6 +44,10 @@ fn main() {
     // App setup
     let is_processing_ui_change = Arc::new(AtomicBool::new(false));
     let process_gui_samples = Arc::new(AtomicBool::new(false));
+    let thread_pool = Arc::new(rayon::ThreadPoolBuilder::new()
+        .num_threads(32)
+        .build()
+        .unwrap());
 
     let mut app = App::load().unwrap_or_default();
     app.scope = Some(Scope::new());
@@ -57,6 +61,7 @@ fn main() {
     app.process_gui_samples = process_gui_samples.clone();
     app.rms_calc_left = RmsCalculator::new(5000);
     app.rms_calc_right = RmsCalculator::new(5000);
+    app.thread_pool = Some(thread_pool);
 
     // Audio output setup
     let _audio_thread = thread::spawn(move || {

@@ -30,6 +30,7 @@ impl eframe::App for App {
             match cmd_rx.try_recv() {
                 Ok(cmd) => match cmd {
                     UiCommand::LibraryAddItem(lib_item) => self.library.add_item(lib_item),
+                    UiCommand::LibraryAddItems(lib_items) => self.library.add_items(lib_items),
                     UiCommand::LibraryAddView(lib_view) => self.library.add_view(lib_view),
                     UiCommand::LibraryAddPathId(path_id) => {
                         self.library.set_path_to_imported(path_id)

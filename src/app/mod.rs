@@ -8,14 +8,15 @@ use rms_calculator::RmsCalculator;
 use scope::Scope;
 
 use serde::{Deserialize, Serialize};
+
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::Arc;
-
-use itertools::Itertools;
 
 use id3::{Tag, TagLike};
 use rayon::prelude::*;
+use rayon::ThreadPool;
 
 mod app;
 mod components;
@@ -43,6 +44,7 @@ pub enum UiCommand {
     SampleRate(f32),
     LibraryAddView(LibraryView),
     LibraryAddItem(LibraryItem),
+    LibraryAddItems(Vec<LibraryItem>),
     LibraryAddPathId(LibraryPathId),
 }
 
@@ -110,6 +112,9 @@ pub struct App {
 
     #[serde(skip_serializing, skip_deserializing)]
     pub is_processing_ui_change: Option<Arc<AtomicBool>>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub thread_pool: Option<Arc<ThreadPool>>,
 }
 
 impl Default for App {
@@ -138,6 +143,7 @@ impl Default for App {
             lib_config_selections: Default::default(),
             is_library_cfg_open: false,
             is_processing_ui_change: None,
+            thread_pool: None,
         }
     }
 }
@@ -185,82 +191,81 @@ impl App {
         let path = lib_path.path().clone();
         let path_id = lib_path.id().clone();
 
-        std::thread::spawn(move || {
-            let files = walkdir::WalkDir::new(path)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .skip(1)
-                .filter(|entry| {
-                    entry.file_type().is_file()
-                        && entry.path().extension().unwrap_or(std::ffi::OsStr::new("")) == "mp3"
-                })
-                .collect::<Vec<_>>();
+        if let Some(thread_pool) = &self.thread_pool {
+            let thread_pool = thread_pool.clone();
 
-            let items = files
-                .par_iter()
-                .map(|entry| {
-                    let tag = Tag::read_from_path(&entry.path());
+            std::thread::spawn(move || {
+                let tx = Mutex::new(cmd_tx.clone());
 
-                    let library_item = match tag {
-                        Ok(tag) => LibraryItem::new(entry.path().to_path_buf(), path_id)
-                            .set_title(tag.title())
-                            .set_artist(tag.artist())
-                            .set_album(tag.album())
-                            .set_year(tag.year())
-                            .set_genre(tag.genre())
-                            .set_track_number(tag.track()),
-                        Err(_err) => {
-                            tracing::warn!("Couldn't parse to id3: {:?}", &entry.path());
-                            LibraryItem::new(entry.path().to_path_buf(), path_id)
-                        }
-                    };
+                let items: Vec<LibraryItem> = thread_pool.install(|| {
+                    walkdir::WalkDir::new(path)
+                        .into_iter()
+                        .filter_map(|e| e.ok())
+                        .skip(1)
+                        .filter(|entry| {
+                            entry.file_type().is_file()
+                                && entry.path().extension().unwrap_or(std::ffi::OsStr::new("")) == "mp3"
+                        })
+                        .par_bridge()
+                        .map(|entry| {
+                            let tag = Tag::read_from_path(&entry.path());
 
-                    return library_item;
-                })
-                .collect::<Vec<LibraryItem>>();
+                            let library_item = match tag {
+                                Ok(tag) => LibraryItem::new(entry.path().to_path_buf(), path_id)
+                                    .set_title(tag.title())
+                                    .set_artist(tag.artist())
+                                    .set_album(tag.album())
+                                    .set_year(tag.year())
+                                    .set_genre(tag.genre())
+                                    .set_track_number(tag.track()),
+                                Err(_err) => {
+                                    // tracing::warn!("Couldn't parse to id3: {:?}", &entry.path());
+                                    LibraryItem::new(entry.path().to_path_buf(), path_id)
+                                }
+                            };
 
-            tracing::info!("Done parsing library items");
+                            return library_item;
+                        })
+                        .inspect(|item| {
+                            tx
+                                .lock()
+                                .unwrap()
+                                .send(UiCommand::LibraryAddItem(item.clone()))
+                                .expect("Failed to send Library items");
+                         })
+                        .collect::<Vec<LibraryItem>>()
+                });
 
-            // Populate the library
-            for item in &items {
-                cmd_tx
-                    .send(UiCommand::LibraryAddItem((*item).clone()))
-                    .expect("failed to send library item")
-            }
+                tracing::info!("Completed adding path to library");
 
-            // Build the views
-            let mut library_view = LibraryView {
-                view_type: ViewType::Album,
-                containers: Vec::new(),
-            };
+                let mut grouped: BTreeMap<String, Vec<&LibraryItem>> = BTreeMap::new();
+                for item in &items {
+                    let key = item.album().unwrap_or_else(|| "<?>".to_string());
+                    grouped.entry(key).or_default().push(item);
+                }
 
-            // In order for group by to work from itertools, items must be consecutive, so sort them first.
-            let mut library_items_clone = items.clone();
-            library_items_clone.sort_by_key(|item| item.album());
-
-            let grouped_library_by_album = &library_items_clone
-                .into_iter()
-                .group_by(|item| item.album().unwrap_or("<?>".to_string()).to_string());
-
-            for (album_name, album_library_items) in grouped_library_by_album {
-                let lib_item_container = LibraryItemContainer {
-                    name: album_name.clone(),
-                    items: album_library_items
-                        .map(|item| item.clone())
-                        .collect::<Vec<LibraryItem>>(),
+                let library_view = LibraryView {
+                    view_type: ViewType::Album,
+                    containers: grouped
+                        .into_iter()
+                        .map(|(name, items)| LibraryItemContainer {
+                            name,
+                            items: items.into_iter().cloned().collect(),
+                        })
+                        .collect(),
                 };
 
-                library_view.containers.push(lib_item_container.clone());
-            }
+                cmd_tx
+                    .send(UiCommand::LibraryAddView(library_view))
+                    .expect("Failed to send library view");
 
-            cmd_tx
-                .send(UiCommand::LibraryAddView(library_view))
-                .expect("Failed to send library view");
+                cmd_tx
+                    .send(UiCommand::LibraryAddPathId(path_id))
+                    .expect("Failed to send library view");
 
-            cmd_tx
-                .send(UiCommand::LibraryAddPathId(path_id))
-                .expect("Failed to send library view");
-            //lib_path.set_imported();
-        });
+                //lib_path.set_imported();
+                tracing::info!("Completed creating library view");
+            });
+        }
     }
 }
