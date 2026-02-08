@@ -315,6 +315,7 @@ fn process_audio_cmd(
     }
 }
 
+#[allow(dead_code)]
 enum SeekPosition {
     Time(f64),
     Timestamp(u64),

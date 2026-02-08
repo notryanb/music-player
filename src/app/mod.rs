@@ -111,6 +111,9 @@ pub struct App {
     pub is_library_cfg_open: bool,
 
     #[serde(skip_serializing, skip_deserializing)]
+    pub is_editing_playlist_name: bool,
+
+    #[serde(skip_serializing, skip_deserializing)]
     pub is_processing_ui_change: Option<Arc<AtomicBool>>,
 
     #[serde(skip_serializing, skip_deserializing)]
@@ -142,6 +145,7 @@ impl Default for App {
             quit: false,
             lib_config_selections: Default::default(),
             is_library_cfg_open: false,
+            is_editing_playlist_name: false,
             is_processing_ui_change: None,
             thread_pool: None,
         }

@@ -2,7 +2,7 @@ use eframe::egui;
 use rb::RbConsumer;
 use std::sync::atomic::Ordering;
 
-use super::{App, UiCommand};
+use super::{App, Playlist, UiCommand};
 use crate::app::components::{
     footer::Footer, library_component::LibraryComponent, menu_bar::MenuBar,
     player_component::PlayerComponent, playlist_table::PlaylistTable, playlist_tabs::PlaylistTabs,
@@ -183,8 +183,30 @@ impl eframe::App for App {
 
         egui::CentralPanel::default().show(ctx, |_ui| {
             egui::TopBottomPanel::top("Playlist Tabs").show(ctx, |ui| {
+                let click_res = ui.interact(ui.response().rect, ui.response().id, egui::Sense::click());
+
+                if click_res.double_clicked() && !self.is_editing_playlist_name {
+                    let default_name_count = self
+                        .playlists
+                        .iter()
+                        .filter(|pl| pl.get_name().unwrap().starts_with("New Playlist"))
+                        .count();
+
+                    let playlist_name = match default_name_count {
+                        0 => "New Playlist".to_string(),
+                        _ => format!("New Playlist ({})", default_name_count - 1),
+                    };
+
+                    let mut new_playlist = Playlist::new();
+                    new_playlist.set_name(playlist_name);
+
+                    self.playlists.push(new_playlist.clone());
+                    self.current_playlist_idx = Some(self.playlists.len() - 1);
+                }
+
                 PlaylistTabs::add(self, ui);
             });
+
 
             egui::CentralPanel::default().show(ctx, |ui| {
                 if let Some(_current_playlist_idx) = &mut self.current_playlist_idx {

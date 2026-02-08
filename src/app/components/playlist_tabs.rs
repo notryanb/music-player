@@ -12,7 +12,7 @@ impl AppComponent for PlaylistTabs {
             for (idx, playlist) in ctx.playlists.iter_mut().enumerate() {
                 let mut playlist_name = playlist.get_name().unwrap();
 
-                if playlist.is_editing_name {
+                if ctx.is_editing_playlist_name && playlist.is_editing_name {
                     let response = ui.add(egui::TextEdit::singleline(&mut playlist_name));
 
                     if response.changed() {
@@ -20,6 +20,7 @@ impl AppComponent for PlaylistTabs {
                     }
 
                     if response.lost_focus() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        ctx.is_editing_playlist_name = false;
                         playlist.is_editing_name = false;
                     }
                 } else {
@@ -31,15 +32,16 @@ impl AppComponent for PlaylistTabs {
                     }
 
                     egui::containers::Popup::context_menu(&playlist_tab)
-                        .id(egui::Id::new("playlist_options_menu"))
+                        .id(egui::Id::new(format!("playlist_options_menu {}", idx)))
                         .show(|ui| {
                             if ui.button("Remove Playlist").clicked() {
                                 ctx.playlist_idx_to_remove = Some(idx);
                             }
                         });
 
-                    if playlist_tab.double_clicked() {
+                    if playlist_tab.double_clicked() && !ctx.is_editing_playlist_name {
                         playlist.is_editing_name = true;
+                        ctx.is_editing_playlist_name = true;
                     }
                 }
             }
