@@ -102,10 +102,12 @@ impl AppComponent for MenuBar {
             });
 
             ui.menu_button("View", |ui| {
-                let osc_button = ui.button("Oscilloscope");
-
-                if osc_button.clicked() {
+                if ui.button("Oscilloscope").clicked() {
                     ctx.show_oscilloscope = !ctx.show_oscilloscope;
+                }
+
+                if ui.button("RMS Meter").clicked() {
+                    ctx.show_rms_meter = !ctx.show_rms_meter;
                 }
             });
 

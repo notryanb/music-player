@@ -175,7 +175,7 @@ impl eframe::App for App {
 
         egui::CentralPanel::default().show(ctx, |_ui| {
             egui::SidePanel::left("Library Window")
-                .default_width(500.0)
+                .min_width(250.0)
                 .show(ctx, |ui| {
                     LibraryComponent::add(self, ui);
                 });
@@ -215,24 +215,26 @@ impl eframe::App for App {
                     });
                 }
 
-                // Temporary
-                if self.show_oscilloscope {
-                    eframe::egui::Window::new("RMS Meter")
+                if self.show_rms_meter {
+                    let mut window = eframe::egui::Window::new("RMS Meter")
                         .default_width(400.0)
                         .default_height(600.0)
                         .resizable([true, true])
-                        .collapsible(false)
-                        .show(ctx, |ui| {
-                            ui.add(
-                                Meter::new(&[self.rms_meter[0], self.rms_meter[1]])
-                                    .with_ticks(&DB_TICKS)
-                                    .with_sections(&DB_SECTIONS)
-                                    .with_text_above("RMS")
-                                    .with_bar_width(10.0)
-                                    .show_max(true)
-                                    .with_mapper(&DbMapper),
-                            );
-                        });
+                        .collapsible(false);
+
+                    window = window.open(&mut self.show_rms_meter);
+                        
+                    window.show(ctx, |ui| {
+                        ui.add(
+                            Meter::new(&[self.rms_meter[0], self.rms_meter[1]])
+                                .with_ticks(&DB_TICKS)
+                                .with_sections(&DB_SECTIONS)
+                                .with_text_above("RMS")
+                                .with_bar_width(10.0)
+                                .show_max(true)
+                                .with_mapper(&DbMapper),
+                        );
+                    });
                 }
             });
         });

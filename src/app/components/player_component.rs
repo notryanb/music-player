@@ -16,7 +16,10 @@ impl AppComponent for PlayerComponent {
             let prev_btn = ui.button("|◀");
             let next_btn = ui.button("▶|");
 
-            let mut volume = ctx.player.as_ref().unwrap().volume;
+            // I don't love the fact that the player needs to keep track of volume, too.
+            // I'm still thinking about this, because the backend should be similar to a music server
+            // and the frontend should be separate. This means it might need to be stored in both places.
+            let mut volume = ctx.volume;
             let previous_vol = volume;
 
             let volume_slider = ui.add(
@@ -26,14 +29,17 @@ impl AppComponent for PlayerComponent {
                     .clamping(SliderClamping::Always)
                     .step_by(0.01)
                     .custom_formatter(|num, _| {
+                        // TODO - Create a to_db(f32) helper
                         let db = 20.0 * num.log10();
                         format!("{db:.02}dB")
                     }),
             );
 
             if volume_slider.dragged() {
+                // This should probably send a SetVolume message and be handled in the main loop
                 if let Some(is_processing_ui_change) = &ctx.is_processing_ui_change {
                     if volume != previous_vol {
+                        ctx.volume = volume;
                         ctx.player
                             .as_mut()
                             .unwrap()

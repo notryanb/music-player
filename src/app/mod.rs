@@ -58,7 +58,12 @@ pub struct App {
 
     pub show_oscilloscope: bool,
 
+    pub show_rms_meter: bool,
+
     pub rms_meter_window_size_millis: u16,
+
+    // I'm kinda regretting making a nested Player struct instead of one giant flat struct
+    pub volume: f32,
 
     pub device_sample_rate: f32,
 
@@ -126,8 +131,11 @@ impl Default for App {
             library: Library::new(),
             playlists: vec![],
             current_playlist_idx: None,
+            // All of these show_XYZ booleans can probably be captured in a bitmap
             show_oscilloscope: false,
+            show_rms_meter: false,
             show_preferences_window: false,
+            volume: 0.707,
             device_sample_rate: 44100.0,
             rms_meter_window_size_millis: 250,
             rms_calc_left: RmsCalculator::new(5000),
