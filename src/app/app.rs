@@ -1,8 +1,10 @@
 use eframe::egui;
 use rb::RbConsumer;
 use std::sync::atomic::Ordering;
+use id3::{Tag, TagLike};
+use rand::Rng;
 
-use super::{App, Playlist, UiCommand};
+use super::{App, LibraryItem, LibraryPathId, Playlist, UiCommand};
 use crate::app::components::{
     footer::Footer, library_component::LibraryComponent, menu_bar::MenuBar,
     player_component::PlayerComponent, playlist_table::PlaylistTable, playlist_tabs::PlaylistTabs,
@@ -60,6 +62,37 @@ impl eframe::App for App {
                 },
                 Err(_) => (),
             }
+        }
+
+        /* Drag files into playlist from Desktop */
+        if let Some(current_playlist_idx) = self.current_playlist_idx {
+            ctx.input_mut(|i| {
+               if let Some(file) = i.raw.dropped_files.pop() {
+                    if let Some(path) = file.path {
+                    tracing::info!("Dropped file: '{}'", path.display());
+                        if path.extension().unwrap_or(std::ffi::OsStr::new("")) == "mp3" {
+                            let tag = Tag::read_from_path(&path);
+                            let library_item = match tag {
+                                Ok(tag) => LibraryItem::new(path.clone(), LibraryPathId::new(rand::thread_rng().gen()))
+                                    .set_title(tag.title())
+                                    .set_artist(tag.artist())
+                                    .set_album(tag.album())
+                                    .set_year(tag.year())
+                                    .set_genre(tag.genre())
+                                    .set_track_number(tag.track()),
+                                Err(_err) => {
+                                    tracing::warn!("Couldn't parse to id3: {:?}", &path);
+                                    LibraryItem::new(path.clone(), LibraryPathId::new(0))
+                                }
+                            };
+
+                            let playlist = &mut self.playlists[current_playlist_idx];
+                            playlist.add(library_item);
+                            tracing::info!("Added file to playlist: '{}'", &path.display());
+                       }
+                   }
+               } 
+            });
         }
 
         // copy data from the gui ring buffer into a local collection

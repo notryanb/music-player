@@ -6,6 +6,9 @@ use std::sync::mpsc::Sender;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Playlist {
     name: Option<String>,
+    // Note: Using a vec seems good, until I want to re-order and drag/drop songs.
+    // ex: What if the playlist was 100,000 songs long and I moved the last item to the beginning.
+    // Then all of the 99k tracks need to be shifted back by 1. Maybe a linked list is the right choice?
     pub tracks: Vec<LibraryItem>,
     pub selected: Option<LibraryItem>,
     pub is_editing_name: bool,

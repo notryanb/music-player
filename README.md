@@ -46,11 +46,12 @@ It is not meant to be used as a serious audio player.
 - [x] Fix library view performance. Don't need to keep computing the grouping every frame - persist it in app state with a new data structure.
 - [x] Fix all egui deprecation errors... should be just one for using `CollapsingState` instead of `CollapsingHeader`
 - [ ] Support horizontal display of RMS meter and expose that option in the preferences.
-- [ ] Drag and drop files
+- [x] Drag and drop files
 - [ ] Fix Dark mode now that egui has made some changes in 0.18
 - [ ] Figure out error handling (anyhow, eyre, thiserror, etc...)
 - [ ] Flatten the app state and handle all UI Commands in one spot. This way the state has a way to act on all the subsystems in one spot
 - [x] Remove tracks from playlist.
+- [ ] Add right-click context menu to items in playlist
 - [ ] Reorder items in playlist.
 - [x] Support multiple directories for library
 - [ ] Figure out how to use at least one hotkey and key event.

@@ -61,7 +61,7 @@ impl AppComponent for PlayerComponent {
                     .show_value(false)
                     .clamping(SliderClamping::Always)
                     .trailing_fill(true)
-                    .handle_shape(HandleShape::Rect { aspect_ratio: 0.5 }),
+                    .handle_shape(HandleShape::Rect { aspect_ratio: 0.2 }),
             );
 
             ctx.player
