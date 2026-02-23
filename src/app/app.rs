@@ -67,9 +67,9 @@ impl eframe::App for App {
         /* Drag files into playlist from Desktop */
         if let Some(current_playlist_idx) = self.current_playlist_idx {
             ctx.input_mut(|i| {
-               if let Some(file) = i.raw.dropped_files.pop() {
-                    if let Some(path) = file.path {
-                    tracing::info!("Dropped file: '{}'", path.display());
+               for file in i.raw.dropped_files.iter() {
+                    if let Some(path) = &file.path {
+                        tracing::info!("Dropped file: '{}'", path.display());
                         if path.extension().unwrap_or(std::ffi::OsStr::new("")) == "mp3" {
                             let tag = Tag::read_from_path(&path);
                             let library_item = match tag {
