@@ -249,6 +249,10 @@ impl eframe::App for App {
                 }
 
                 if self.show_rms_meter {
+                    if !self.process_gui_samples.load(Ordering::Relaxed) {
+                        self.process_gui_samples.store(true, Ordering::Relaxed);
+                    }
+
                     let mut window = eframe::egui::Window::new("RMS Meter")
                         .default_width(400.0)
                         .default_height(600.0)
